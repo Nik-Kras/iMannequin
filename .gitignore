@@ -1,0 +1,10 @@
+node_modules
+dist
+dev-dist
+test-results
+playwright-report
+*.local
+.DS_Store
+.cache/
+# Never commit real photos (R2): keep personal test images here
+private/
