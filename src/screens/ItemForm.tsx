@@ -41,7 +41,8 @@ const unrecognised = (item: Item) => item.status === 'review' && !!item.suggesti
 
 function formOf(item: Item, lang: Lang): Form {
   return {
-    id: item.id, name: item.name, nameAuto: item.name === autoName(lang, item.category, item.colours[0]),
+    // An unrecognised garment's name is a placeholder too: it follows the category the user picks.
+    id: item.id, name: item.name, nameAuto: unrecognised(item) || item.name === autoName(lang, item.category, item.colours[0]),
     category: unrecognised(item) ? undefined : item.category, colours: item.colours, seasons: item.seasons, locationId: item.locationId,
     brand: item.brand ?? '', notes: item.notes ?? '',
   };

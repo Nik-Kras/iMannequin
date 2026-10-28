@@ -40,10 +40,32 @@ async function seedItem(page: Page, o: SeedItem) {
   return o.id;
 }
 
-/** A queue job as the queue stores it (photo bytes + state), for the inbox and the camera strip. */
+/**
+ * A queue job for the inbox and the camera strip. The photo bytes go where this version of the queue keeps
+ * them: in the job record, or in the write-once photo table when there is one.
+ */
 async function seedJob(page: Page, o: { id: string; state: 'waiting' | 'working' | 'done' | 'failed'; error?: string; errorCode?: string; itemId?: string; createdAt?: number }) {
   await withDb(page, `${PNG('#a8323a')}
-    await db.queue.put({ kind: 'garment', blob: png, createdAt: ${o.createdAt ?? 'Date.now()'}, ...${JSON.stringify(o)} });`);
+    if (db.queuePhotos) await db.queuePhotos.put({ jobId: '${o.id}', blob: png, preview: png });
+    await db.queue.put({ kind: 'garment', ...(db.queuePhotos ? {} : { blob: png }), createdAt: ${o.createdAt ?? 'Date.now()'}, ...${JSON.stringify(o)} });`);
+}
+
+/** Makes the next `times` writes that store a new queue photo fail like iOS, whichever table and method the queue uses. */
+async function failQueueWrites(page: Page, times = Infinity) {
+  await page.evaluate((times) => {
+    const db = (window as any).__imq.db;
+    let left = times;
+    for (const name of ['queue', 'queuePhotos']) {
+      const t = db[name];
+      if (!t) continue;
+      for (const m of ['add', 'bulkAdd', 'put', 'bulkPut']) {
+        const real = t[m].bind(t);
+        t[m] = (...a: unknown[]) => (left-- > 0
+          ? Promise.reject(new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'))
+          : real(...a));
+      }
+    }
+  }, times === Infinity ? 1e9 : times);
 }
 
 const toast = (page: Page) => page.locator('.toast');
@@ -73,8 +95,7 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
     const shutter = page.getByRole('button', { name: 'Take photo' });
     await expect(shutter).toBeVisible();
     await page.waitForFunction(() => (document.querySelector('video') as HTMLVideoElement | null)?.videoWidth);
-    await failWrites(page, 'queue', 'bulkAdd', 2);
-    await failWrites(page, 'queue', 'add', 2);
+    await failQueueWrites(page, 2);
     await shutter.click();
     await expect(toast(page)).toContainText('Couldn’t keep the photo');
     await expect(page.locator('.wd-cam__flash')).toHaveCount(0);
@@ -85,8 +106,7 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
 
   test('#3 a gallery import that can’t be stored says so', async ({ page }) => {
     await openApp(page, { route: '/add' });
-    await failWrites(page, 'queue', 'bulkAdd');
-    await failWrites(page, 'queue', 'add');
+    await failQueueWrites(page);
     await page.locator('label.wd-cam__side input[type=file]').setInputFiles([await garmentFile(page, 'tee'), await garmentFile(page, 'jeans')]);
     await expect(toast(page)).toContainText('Couldn’t keep the photo');
   });
@@ -433,7 +453,8 @@ test.describe('#11 the Add-clothes strip', () => {
 
 test('#20 an unrecognised garment has no category until the user picks one', async ({ page }) => {
   await openApp(page);
-  await seedItem(page, { id: 'u1', name: 'Navy T-shirt', suggestion: { categories: [], colours: ['navy'], seasons: [], aiFields: ['name', 'colours'] } });
+  // As the queue stores a garment it didn't recognise: a placeholder category, no category or name from the AI.
+  await seedItem(page, { id: 'u1', name: 'Navy T-shirt', suggestion: { categories: [], colours: ['navy'], seasons: [], aiFields: ['colours'] } });
   await page.goto('./?e2e#/item/u1');
   await expect(page.getByText('The AI didn’t recognise it. Choose a category.')).toBeVisible();
   const group = page.getByRole('group', { name: 'Category' });
@@ -443,6 +464,7 @@ test('#20 an unrecognised garment has no category until the user picks one', asy
   await group.getByRole('button', { name: 'All categories' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Jeans' }).click();
   await expect(save).toBeEnabled();
+  await expect(page.getByLabel('Name')).toHaveValue('Navy jeans');
   await save.click();
   await expect.poll(() => withDb(page, `return (await db.items.get('u1')).category`)).toBe('jeans');
 });
