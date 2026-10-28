@@ -21,8 +21,8 @@ export type ToWorker =
   | { type: 'embed-text'; id: number; texts: string[]; spec: ModelSpec }
   | { type: 'generate'; id: number; spec: ModelSpec; messages: Msgs; maxTokens: number }
   | { type: 'describe'; id: number; blob: Blob; spec: ModelSpec }
-  /** Free every model and the GPU device; the client terminates the worker after the answer (bug-audit #6). */
-  | { type: 'dispose'; id: number };
+  /** Free every model (bug-audit #6); `final`: also the GPU device, as the client terminates the worker next. */
+  | { type: 'dispose'; id: number; final?: boolean };
 
 export interface CutoutOut { png: Blob; width: number; height: number; confidence: number; reasons: string[]; clean: boolean; crop?: { x: number; y: number; w: number; h: number } }
 
@@ -71,6 +71,8 @@ async function tf(): Promise<TF> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
 const loaded = new Map<string, Promise<Any>>();
+/** A WebGPU session ran in this worker, so ONNX Runtime holds a GPU device. */
+let gpuUsed = false;
 
 function progressFor(id: number, spec: ModelSpec) {
   const files = spec.files?.[device] ?? {};
@@ -103,6 +105,7 @@ function load(spec: ModelSpec, part: string, id: number): Promise<Any> {
     // On the CPU, WebAssembly memory only grows; ORT's arena and memory-pattern planner keep peak
     // buffers around, which pushes 1024 × 1024 segmentation models past the limit (std::bad_alloc).
     const session_options = device === 'wasm' ? { enableCpuMemArena: false, enableMemPattern: false } : undefined;
+    if (device === 'webgpu') gpuUsed = true;
     const opts = { device, progress_callback: progressFor(id, spec), session_options };
     switch (`${spec.kind}:${part}`) {
       case 'segmentation:main':
@@ -266,8 +269,9 @@ async function describe(id: number, blob: Blob, spec: ModelSpec): Promise<string
 }
 
 // ---- Letting go (bug-audit #6) ----
-// Terminating a worker that still holds an ONNX Runtime WebGPU session kills the WebKit page about 1.5 s later.
-// Before the client terminates this worker, every session is released and the GPU device destroyed.
+// Before another model loads, every session here is released. In WebKit, terminating a worker that has run an
+// ONNX Runtime WebGPU session kills the page about 1.5 s later even then, so a WebGPU worker is kept and loads the
+// next model itself; only a worker about to be terminated (`final`) also destroys its GPU device.
 
 /** Disposes every distinct loaded model (a pipeline, or a { model } pair). Returns how many were disposed. */
 export async function disposeModels(models: Iterable<Promise<unknown>>): Promise<number> {
@@ -279,21 +283,26 @@ export async function disposeModels(models: Iterable<Promise<unknown>>): Promise
       if (!target || seen.has(target) || typeof target.dispose !== 'function') continue;
       seen.add(target);
       await target.dispose();
-    } catch { /* a model that failed to load or to free: the terminate takes the rest */ }
+    } catch { /* a model that failed to load, or to free */ }
   }
   return seen.size;
 }
 
-async function disposeAll(): Promise<void> {
+async function disposeAll(final: boolean): Promise<string> {
   const models = [...loaded.values()];
   loaded.clear();
   const n = await disposeModels(models);
   // The device getter creates a device when no session made one, so only ask after a WebGPU model ran.
-  if (!n || device !== 'webgpu' || !T) return;
+  if (!final || !gpuUsed || !T) return `${n} models`;
   try {
-    const gpu = (T.env.backends.onnx as unknown as { webgpu?: { device?: Promise<{ destroy?: () => void }> } }).webgpu;
-    (await gpu?.device)?.destroy?.();
-  } catch { /* no device to free */ }
+    const gpu = (T.env.backends.onnx as unknown as { webgpu?: { device?: Promise<GPUDevice> } }).webgpu;
+    const d = await gpu?.device;
+    await d?.queue.onSubmittedWorkDone();
+    d?.destroy();
+    return `${n} models, device ${d ? 'destroyed' : 'none'}`;
+  } catch (err) {
+    return `${n} models, device: ${String(err)}`;
+  }
 }
 
 const post = (m: FromWorker, transfer: Transferable[] = []) => self.postMessage(m, transfer);
@@ -304,7 +313,7 @@ const onMessage = async (e: MessageEvent<ToWorker>) => {
   try {
     let result: unknown;
     switch (m.type) {
-      case 'dispose': await disposeAll(); result = true; break;
+      case 'dispose': result = await disposeAll(!!m.final); break;
       case 'plain': result = await plain(m.blob, m.force); break;
       case 'segment': result = await segment(m.id, m.blob, m.spec); break;
       case 'colours': result = await colours(m.blob); break;

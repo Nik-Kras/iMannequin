@@ -111,13 +111,18 @@ type Job = DistributiveOmit<Exclude<ToWorker, { type: 'init' | 'dispose' }>, 'id
 type Part = 'main' | 'text';
 const partOf = (job: Job): Part => (job.type === 'embed-text' ? 'text' : 'main');
 
-interface Live { worker: Worker; key: string | null; part: Part; device: Device }
+/** `gpu`: the worker has run on WebGPU, so it is never terminated (see releaseAi). */
+interface Live { worker: Worker; key: string | null; part: Part; device: Device; gpu: boolean }
 let live: Live | null = null;
+/** A WebGPU worker whose models were disposed, kept for the next model. */
+let spare: Worker | null = null;
 let nextId = 1;
 const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; onProgress?: Progress }>();
 
 function spawn(key: string | null, device: Device, part: Part): Live {
-  const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+  const reused = spare;
+  spare = null;
+  const worker = reused ?? new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
   worker.postMessage({ type: 'init', device } satisfies ToWorker);
   worker.onmessage = (e: MessageEvent<FromWorker>) => {
     const m = e.data;
@@ -139,7 +144,7 @@ function spawn(key: string | null, device: Device, part: Part): Live {
     for (const [id, p] of pending) { pending.delete(id); p.reject(err); }
     if (live?.worker === worker) live = null;
   };
-  return { worker, key, part, device };
+  return { worker, key, part, device, gpu: device === 'webgpu' || !!reused };
 }
 
 /** How long a worker gets to free its model before it is terminated anyway. */
@@ -147,29 +152,34 @@ export const DISPOSE_TIMEOUT_MS = 5000;
 let releasing: Promise<void> = Promise.resolve();
 
 /**
- * Frees the model's memory. It reloads from the browser cache next time. Resolves once the worker is gone:
- * the worker first disposes its sessions and the GPU device, because terminating a worker that still holds an
- * ONNX Runtime WebGPU session kills the WebKit page (bug-audit #6).
+ * Frees the model's memory; it reloads from the browser cache next time. Resolves once the model is gone.
+ * The worker disposes its sessions first (bug-audit #6). A worker that has run on WebGPU is then kept for the next
+ * model instead of terminated: in WebKit, terminating a worker that has run an ONNX Runtime WebGPU session kills
+ * the page about 1.5 s later, even after its sessions were released. A CPU worker is terminated, which is the only
+ * way to give WebAssembly memory back. `kill` terminates in any case (a runaway job).
  */
-export function releaseAi(): Promise<void> {
+export function releaseAi({ kill = false }: { kill?: boolean } = {}): Promise<void> {
   const old = live;
   if (old) {
     live = null;
     for (const [id, p] of pending) { pending.delete(id); p.reject(new Error('released')); }
-    releasing = releasing.then(() => retire(old));
+    releasing = releasing.then(() => retire(old, kill));
   }
   return releasing;
 }
 
-async function retire(old: Live): Promise<void> {
+async function retire(old: Live, kill: boolean): Promise<void> {
   // If the page dies while the model is freed, that model is the one to blame.
   const s = store();
   const before = s?.getItem(RUNNING) ?? null;
   if (old.key) s?.setItem(RUNNING, old.key);
+  // Tried and still fatal in WebKit: releasing the sessions, destroying the GPU device and waiting 2.5 s first.
+  const keep = old.gpu && !kill;
   try {
-    await dispose(old.worker);
+    await dispose(old.worker, !keep);
   } finally {
-    old.worker.terminate();
+    if (keep) spare = old.worker;
+    else old.worker.terminate();
     if (old.key) {
       if (before) s?.setItem(RUNNING, before);
       else s?.removeItem(RUNNING);
@@ -177,8 +187,11 @@ async function retire(old: Live): Promise<void> {
   }
 }
 
-/** Asks the worker to free its models; resolves when it answers, or after DISPOSE_TIMEOUT_MS (a busy or broken worker). */
-function dispose(worker: Worker): Promise<void> {
+/**
+ * Asks the worker to free its models (`final`: and its GPU device, as it is about to be terminated); resolves when
+ * it answers, or after DISPOSE_TIMEOUT_MS (a busy or broken worker).
+ */
+function dispose(worker: Worker, final: boolean): Promise<void> {
   return new Promise<void>((resolve) => {
     const id = nextId++;
     const finish = () => {
@@ -190,7 +203,7 @@ function dispose(worker: Worker): Promise<void> {
     const timer = setTimeout(finish, DISPOSE_TIMEOUT_MS);
     worker.addEventListener('message', onMessage);
     try {
-      worker.postMessage({ type: 'dispose', id } satisfies ToWorker);
+      worker.postMessage({ type: 'dispose', id, final } satisfies ToWorker);
     } catch {
       finish();
     }
@@ -221,7 +234,7 @@ export async function run<T>(modelKey: string | null, job: Job, opts: { onProgre
       ? setTimeout(() => {
           if (!pending.has(id)) return;
           pending.delete(id);
-          if (live === w) void releaseAi(); // stops a runaway generation
+          if (live === w) void releaseAi({ kill: true }); // stops a runaway generation
           record('ai.timeout', { model: modelKey, job: job.type });
           reject(new Error('timeout'));
         }, opts.timeoutMs)

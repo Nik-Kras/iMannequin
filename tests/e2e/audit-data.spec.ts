@@ -92,6 +92,16 @@ test.describe('#1 queue survives the app closing', () => {
     expect(await withDb(page, `return await db.items.where('status').equals('review').count()`)).toBe(3);
     expect(await deadBlobs(page)).toEqual([]);
   });
+
+  test('#11 a queued photo is stored with a small preview for the strip', async ({ launch }) => {
+    const { page } = await launch({ stallWorker: true });
+    await openApp(page, { route: '/add' });
+    await page.locator('input[type=file][multiple]').setInputFiles([await garmentFile(page, 'tee', '#a33a2a', { W: 1536, H: 2048 })]);
+    await expect.poll(() => withDb(page, `return db.queuePhotos ? await db.queuePhotos.count() : -1`)).toBe(1);
+    const size = await withDb<number[]>(page, `const [p] = await db.queuePhotos.toArray(); const b = await createImageBitmap(p.preview); return [b.width, b.height, p.preview.size];`);
+    expect(Math.max(size[0], size[1])).toBe(96);
+    expect(size[2]).toBeLessThan(10_000);
+  });
 });
 
 test.describe('#2 garments from an earlier session keep their images', () => {
@@ -214,5 +224,65 @@ test.describe('#3 Model lab says when a tap didn\'t work', () => {
     await failWrites(page, 'settings', 'put');
     await use.click();
     await expect(page.getByText('Couldn’t save. Try again.')).toBeVisible();
+  });
+});
+
+test.describe('#6 / #8 real models in one session (needs IMQ_MODEL_MIRROR)', () => {
+  test('#6 four garments on a busy table are processed without the page crashing; a WebGPU worker is reused, never terminated', async ({ launch }) => {
+    test.setTimeout(420_000);
+    const { context, page } = await launch({ models: 'mirror' });
+    // Logs what the app tells its AI workers.
+    await context.addInitScript(() => {
+      const log: string[] = ((window as unknown as { __workerLog: string[] }).__workerLog = []);
+      const ids = new WeakMap<object, number>();
+      let count = 0;
+      const id = (w: object) => { if (!ids.has(w)) { ids.set(w, ++count); log.push(`spawn ${count}`); } return ids.get(w); };
+      const proto = Worker.prototype as unknown as { postMessage: (...a: unknown[]) => void; terminate: () => void };
+      const { postMessage, terminate } = proto;
+      proto.postMessage = function (this: object, ...a: unknown[]) {
+        const n = id(this);
+        if ((a[0] as { type?: string })?.type === 'dispose') log.push(`dispose ${n}`);
+        return postMessage.apply(this, a);
+      };
+      proto.terminate = function (this: object) { log.push(`terminate ${id(this)}`); return terminate.call(this); };
+    });
+    let crashed = false;
+    page.on('crash', () => { crashed = true; });
+    await openApp(page, { route: '/add' });
+    await page.getByRole('dialog').getByRole('button', { name: 'Continue' }).click();
+    // Garments on wooden planks with clutter: the plain-background cut-out gives up, so the cut-out model runs.
+    const files = [];
+    for (const [i, [kind, colour]] of [['tee', '#1f3a5f'], ['jeans', '#a8323a'], ['sweater', '#4f7a4a'], ['skirt', '#c9962f']].entries()) {
+      const data = await page.evaluate(({ kind, colour }) => {
+        const W = 1200, H = 1600;
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        const g = c.getContext('2d')!;
+        for (let y = 0; y < H; y += H / 9) { g.fillStyle = `hsl(${25 + (y % 7)}, 35%, ${45 + (y / H) * 15}%)`; g.fillRect(0, y, W, H / 9 - 4); }
+        for (let k = 0; k < 300; k++) { g.strokeStyle = `rgba(60,30,10,${0.15 + (k % 5) / 20})`; g.lineWidth = 2 + (k % 4); g.beginPath(); const y0 = (k * 7919) % H; g.moveTo(0, y0); g.bezierCurveTo(W / 3, y0 + 30, (2 * W) / 3, y0 - 30, W, y0 + 10); g.stroke(); }
+        for (let k = 0; k < 12; k++) { g.fillStyle = ['#d33', '#36c', '#eee', '#222', '#f90'][k % 5]; g.fillRect((k * 104729) % W, (k * 7919) % H, W / 14, H / 20); }
+        const t = document.createElement('canvas'); t.width = W; t.height = H;
+        (window as unknown as { __imqLib: { draw: (...a: unknown[]) => void } }).__imqLib.draw(t.getContext('2d'), W, H, { type: 'garment', kind, colour, bg: 'rgba(0,0,0,0)' });
+        g.drawImage(t, 0, 0);
+        return c.toDataURL('image/jpeg', 0.9);
+      }, { kind, colour });
+      files.push({ name: `busy-${i}.jpg`, mimeType: 'image/jpeg', buffer: Buffer.from(data.split(',')[1], 'base64') });
+    }
+    await page.locator('input[type=file][multiple]').setInputFiles(files);
+    await expect.poll(() => withDb(page, `return await db.queue.count()`)).toBe(4);
+    await expect.poll(async () => crashed || (await queueStates(page).catch(() => ['?'])).every((s) => s === 'done' || s.startsWith('failed')), { timeout: 400_000, intervals: [2000] }).toBe(true);
+    expect(crashed).toBe(false);
+    expect(await queueStates(page)).toEqual(['done', 'done', 'done', 'done']);
+    const cutBy = await withDb<string[]>(page, `return (await db.photos.toArray()).map((p) => p.cutoutModel)`);
+    expect(cutBy.filter((m) => m !== 'plain-bg').length).toBeGreaterThan(0);
+    // The queue let the models go once it was empty (#8), and never terminated a worker it hadn't asked to dispose.
+    const workerLog = () => page.evaluate(() => (window as unknown as { __workerLog: string[] }).__workerLog);
+    await expect.poll(async () => (await workerLog()).at(-1)).toMatch(/^(dispose|terminate)/);
+    const log = await workerLog();
+    for (const entry of log.filter((l) => l.startsWith('terminate'))) expect(log.indexOf(entry.replace('terminate', 'dispose'))).toBeGreaterThanOrEqual(0);
+    // On WebGPU one worker does all of it: cut-out model, CLIP's text half, CLIP's image half.
+    if (await page.evaluate(async () => !!(await (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter()))) {
+      expect(log.filter((l) => l.startsWith('spawn'))).toEqual(['spawn 1']);
+      expect(log.filter((l) => l.startsWith('terminate'))).toEqual([]);
+    }
   });
 });

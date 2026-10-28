@@ -282,7 +282,7 @@ describe('#3 data writes survive iOS dropping the connection', () => {
   it('#3 saving an item, a place or a merge is retried once after the connection is lost', async () => {
     const { saveItem } = await import('../../src/data/repo');
     const { addPlace, mergeIntoExisting } = await import('../../src/wardrobe/ops');
-    const lost = () => Promise.reject(new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'));
+    const lost = (() => Promise.reject(new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'))) as never;
     const item = { id: 'i', name: 'Tee', category: 'tshirt' as const, colours: [], seasons: [], status: 'active' as const, createdAt: 1, updatedAt: 1 };
     vi.spyOn(db.items, 'put').mockImplementationOnce(lost);
     await saveItem(item);
@@ -340,10 +340,28 @@ describe('#6 / #8 the AI worker is let go safely', () => {
     vi.stubGlobal('localStorage', { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) });
     vi.stubGlobal('Worker', FakeWorker);
     events.length = 0;
+    vi.resetModules(); // a fresh client (no kept worker) per test
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('#6 a worker disposes its models before it is terminated, and a crash meanwhile is blamed on that model', async () => {
+  it('#6 a WebGPU worker is never terminated: its models are disposed and it loads the next one; a crash meanwhile is blamed on the right model', async () => {
+    const { guarded, run, releaseAi } = await import('../../src/ai/client');
+    await guarded('ormbg@webgpu', () => run('ormbg@webgpu', { type: 'segment', blob, spec: spec('ormbg') }));
+    await guarded('clip-b32@webgpu', () => run('clip-b32@webgpu', { type: 'embed-text', texts: ['a photo of jeans'], spec: spec('clip-b32') }));
+    await guarded('clip-b32@webgpu', () => run('clip-b32@webgpu', { type: 'embed-image', blob, spec: spec('clip-b32') }));
+    await releaseAi(); // the queue is idle
+    const first = events[0].split(' ')[1];
+    expect(events).toEqual([
+      `spawn ${first}`, `${first} segment running=ormbg@webgpu`,
+      // ORMBG is freed under its own name; then CLIP is marked and loads into the same worker.
+      `${first} dispose running=ormbg@webgpu`, `${first} embed-text running=clip-b32@webgpu`,
+      `${first} dispose running=clip-b32@webgpu`, `${first} embed-image running=clip-b32@webgpu`,
+      `${first} dispose running=clip-b32@webgpu`,
+    ]);
+    expect(running()).toBeNull();
+  });
+
+  it('#6 a CPU worker disposes its models before it is terminated, and a crash meanwhile is blamed on that model', async () => {
     const { guarded, run, releaseAi } = await import('../../src/ai/client');
     await guarded('ormbg@wasm', () => run('ormbg@wasm', { type: 'segment', blob, spec: spec('ormbg') }));
     await guarded('clip-b32@wasm', () => run('clip-b32@wasm', { type: 'embed-image', blob, spec: spec('clip-b32') }));
