@@ -60,7 +60,6 @@ export default function BodyPhoto() {
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const gallery = useRef<HTMLInputElement>(null);
-  const capture = useRef<HTMLInputElement>(null);
 
   const run = async (picked: Blob, keep = true) => {
     setPhoto(undefined);
@@ -86,7 +85,6 @@ export default function BodyPhoto() {
     const pending = readPending();
     if (pending) void run(pending, false);
     return dropPending;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +92,6 @@ export default function BodyPhoto() {
     e.target.value = '';
     if (f) { setCamFail(undefined); void run(f); }
   };
-  const take = () => (hasCamera() ? setStep('camera') : capture.current?.click());
   const retake = () => { dropPending(); setResult(undefined); setPhoto(undefined); setStep('guide'); };
   const finish = async () => {
     if (onboarding) {
@@ -131,7 +128,6 @@ export default function BodyPhoto() {
     <>
       {/* Mounted once, whatever the step: a picker opened from an input that then unmounts drops the photo (bug-audit #12). */}
       <input ref={gallery} type="file" accept="image/*" hidden onChange={onFile} />
-      <input ref={capture} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
       {step === 'camera' ? (
         <Camera onShot={(b) => void run(b)} onCancel={() => setStep('guide')} onFail={(why) => { setCamFail(why); setStep('guide'); }} />
       ) : (
@@ -205,7 +201,7 @@ export default function BodyPhoto() {
                     <Icon name="camera" size={20} />{t('body.take')}
                   </label>
                 ) : (
-                  <button type="button" className="btn btn--primary btn--block bp__primary" onClick={take}>
+                  <button type="button" className="btn btn--primary btn--block bp__primary" onClick={() => setStep('camera')}>
                     <Icon name="timer" size={20} />{t('body.takeTimer')}
                   </button>
                 )}
@@ -386,7 +382,6 @@ function Camera({ onShot, onCancel, onFail }: { onShot: (b: Blob) => void; onCan
     if (count <= 3) ticks.tick(880);
     const id = setTimeout(() => setCount(count - 1), 1000);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count]);
 
   const start = () => { ticks.arm(); setCount(10); };

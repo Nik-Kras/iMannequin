@@ -154,7 +154,6 @@ export default function DressUp() {
     y = 0;
     for (const p of placed) { p.top = Math.max(p.top, y); y = p.top + p.h + tr.gap; }
     return { tier: tr, slots: placed };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points, mh, stageH, open]);
 
   const openSlot = (id: Open) => {
@@ -448,7 +447,7 @@ export default function DressUp() {
 
       {saving && <SaveSheet draft={draft} items={wornItems ?? []} busy={saveOutfit.busy} onCancel={() => setSaving(false)} onSave={(n) => void saveOutfit.run(n)} />}
       {toast && (
-        <Toast onDone={() => setToast(null)} ms={toast.undo ? 6000 : undefined} action={toast.undo ? (
+        <Toast onDone={() => setToast(null)} action={toast.undo ? (
           <button type="button" className="text-action" onClick={() => { toast.undo?.(); setToast(null); }}>{t('dressup.undo')}</button>
         ) : undefined}>{toast.text}</Toast>
       )}

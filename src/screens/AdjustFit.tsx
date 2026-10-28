@@ -48,7 +48,6 @@ export default function AdjustFit({ itemId }: { itemId?: string }) {
   useEffect(() => () => {
     const { item: it, fit: f } = latest.current;
     if (touched.current && it && f) void attempt('fit.saveOnLeave', () => storeFit(it.id, f), t('state.saveFailed'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The outfit on the mannequin, with this garment on it.

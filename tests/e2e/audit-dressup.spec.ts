@@ -290,8 +290,19 @@ test('#44 the toast on Dress-up doesn’t cover Save, Wearing today or Share', a
   await page.getByRole('button', { name: 'Wearing today' }).click();
   const toast = page.locator('.toast').filter({ hasText: 'Logged for today' });
   await expect(toast).toBeVisible();
+  await page.waitForTimeout(400); // the toast slides in
   const t = (await toast.boundingBox())!;
   for (const sel of ['.du__save', '.du__wear', '.du__actions .btn--square']) expect(overlaps(t, await box(page, sel)), sel).toBe(false);
+});
+
+test('#42 the clothes row’s links and buttons are at least 44 × 44', async ({ page }) => {
+  await openApp(page, { seed: true, lang: 'uk' });
+  await dress(page);
+  await page.getByRole('button', { name: /^Низ/ }).click();
+  for (const el of await page.locator('.du__row-actions > *').all()) {
+    const b = (await el.boundingBox())!;
+    expect([Math.round(b.width) >= 44, Math.round(b.height) >= 44], await el.textContent() ?? '').toEqual([true, true]);
+  }
 });
 
 test('#48 slots, row cards and See all cards have a pressed state', async ({ page }) => {
