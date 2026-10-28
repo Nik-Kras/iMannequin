@@ -161,6 +161,7 @@ test.describe('#5 backup', () => {
     const file = info.outputPath('backup.imannequin');
     await (await download).saveAs(file);
     await expect(page.getByText('Couldn’t make the backup.')).toHaveCount(0);
+    await expect(page.getByText('1 photo couldn’t be read on this phone, so it isn’t in the backup.')).toBeVisible();
 
     await page.locator('input[type=file][accept*=imannequin]').setInputFiles(file);
     await page.getByRole('button', { name: 'Replace and restore' }).click();

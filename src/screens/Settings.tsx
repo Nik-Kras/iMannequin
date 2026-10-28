@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, updateSettings, withFreshBlobs } from '../data/db';
 import { useLocations, useSettings } from '../data/repo';
-import { applyBackup, BackupError, BACKUP_MIME, backupFileName, exportBackup, readBackup, type ParsedBackup } from '../data/backup';
+import { applyBackup, BackupError, BACKUP_MIME, backupFileName, exportBackupFile, readBackup, type ParsedBackup } from '../data/backup';
 import { requestRoundedLocation, useWeather } from '../data/weather';
 import { MODELS } from '../ai';
 import { ModelsNeeded } from '../ai/ui';
@@ -70,6 +70,7 @@ export default function Settings() {
   const [backup, setBackup] = useState<Backup>({ state: 'idle' });
   const [pending, setPending] = useState<ParsedBackup>();
   const [error, setError] = useState<string>();
+  const [skipped, setSkipped] = useState(0);
   const [toast, setToast] = useState<string>();
   const [storage, setStorage] = useState<{ usage?: number; quota?: number; persisted?: boolean }>();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -142,9 +143,12 @@ export default function Settings() {
 
   const startExport = async () => {
     setError(undefined);
+    setSkipped(0);
     setBackup({ state: 'building', progress: 0 });
     try {
-      const blob = await exportBackup((progress) => setBackup({ state: 'building', progress }));
+      // Photos WebKit lost are left out instead of failing the backup, and the card says how many (bug-audit #5).
+      const { blob, skipped } = await exportBackupFile((progress) => setBackup({ state: 'building', progress }));
+      setSkipped(skipped);
       await finishBackup(new File([blob], backupFileName(), { type: BACKUP_MIME }));
     } catch {
       setBackup({ state: 'idle' });
@@ -282,6 +286,7 @@ export default function Settings() {
               <button type="button" className="text-action set-download" onClick={() => void attempt('backup.download', () => downloadBackup(backup.file), t('state.saveFailed'))}>{t('settings.downloadInstead')}</button>
             </div>
           )}
+          {skipped > 0 && <p className="set-text set-text--ink" role="status">{tn('ai.backup.skipped', skipped)}</p>}
           {error && <p className="set-text set-text--error" role="alert">{error}</p>}
           <div className="life-pair">
             <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void startExport()}>

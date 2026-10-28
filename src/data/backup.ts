@@ -116,7 +116,7 @@ const FLUSH_BYTES = 16 * 1024 * 1024;
 
 export interface BackupResult {
   blob: Blob;
-  /** Images that couldn't be read on this phone and were left out (bug-audit #5). */
+  /** Records (photos, the body) that lost an image this phone couldn't read (bug-audit #5). */
   skipped: number;
 }
 
@@ -177,10 +177,13 @@ export async function exportBackupFile(onProgress?: (p: number) => void): Promis
     onProgress?.((i + 1) / files.length);
   }
 
+  let affected = 0;
   if (skipped.size) {
     // A body record without its photo, cut-out or mask is unusable: the restored phone asks for a new one.
+    const bodies = tables.body.length;
     tables.body = tables.body.filter((r) => !dropMissing(r, skipped));
-    for (const t of TABLES) if (t !== 'body') dropMissing(tables[t], skipped);
+    affected += bodies - tables.body.length;
+    for (const t of TABLES) if (t !== 'body') for (const r of tables[t]) if (dropMissing(r, skipped)) affected++;
   }
   for (const t of TABLES) counts[t] = tables[t].length;
   const manifest: BackupManifest = { format: BACKUP_FORMAT, version: BACKUP_VERSION, app: appVersion(), createdAt, counts, tables };
@@ -190,7 +193,7 @@ export async function exportBackupFile(onProgress?: (p: number) => void): Promis
   zip.end();
   if (failure) throw failure;
   if (!ended) throw new Error('The backup file was not finished');
-  return { blob: new Blob(parts, { type: BACKUP_MIME }), skipped: skipped.size };
+  return { blob: new Blob(parts, { type: BACKUP_MIME }), skipped: affected };
 }
 
 export interface ParsedBackup { manifest: BackupManifest; files: Record<string, Blob> }
