@@ -73,6 +73,11 @@ export function reportError(err: unknown, where: string, data?: Crumb['d']) {
   if (enabled) Sentry.captureException(err, { tags: { where }, extra: data });
 }
 
+/** Unhandled promise rejections go to the black box too (bug-audit #4); Sentry, when on, has its own handler. */
+export function watchUnhandled(target: Pick<Window, 'addEventListener'> = window): void {
+  target.addEventListener('unhandledrejection', (e) => record('error unhandled', describeError((e as PromiseRejectionEvent).reason)));
+}
+
 /** Times `fn` as a Sentry span (shows up under Performance) when diagnostics are on. */
 export function span<T>(name: string, op: string, fn: () => Promise<T>, attributes?: Record<string, string>): Promise<T> {
   return enabled ? Sentry.startSpan({ name, op, attributes }, fn) : fn();

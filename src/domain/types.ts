@@ -172,6 +172,8 @@ export interface AppSettings {
   onboarded: boolean;
   modelsReady: boolean;
   installGuideDismissed: boolean;
+  /** The default places were made once (D22); deleted ones never come back (bug-audit #34). */
+  placesSeeded?: boolean;
   /** Crash reports to Sentry (D50): technical data only, on by default, switchable in Settings. */
   diagnostics: boolean;
   lastBackupAt?: number;
