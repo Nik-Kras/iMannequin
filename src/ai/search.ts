@@ -65,7 +65,7 @@ export async function searchDetailed(text: string, opts: SearchOptions = {}): Pr
             { type: 'generate', spec: llmSpec, messages: llmMessages(text, places), maxTokens: 160 },
             { onProgress: opts.onProgress, timeoutMs: llmDownloaded ? LLM_TIMEOUT : 60 * 60_000 })));
         } finally {
-          releaseAi(); // its memory goes back as soon as it has answered
+          await releaseAi(); // its memory goes back as soon as it has answered
         }
       });
       const parsed = parseLlmAnswer(answer);
