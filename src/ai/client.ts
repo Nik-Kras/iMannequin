@@ -2,6 +2,7 @@
 // and remembers models that crashed the tab so the next candidate is used (as RHP's reader does).
 import type { FromWorker, ToWorker } from './worker';
 import type { Device, ModelSpec } from './registry';
+import { beginRisk, endRisk, record, reportError } from '../diag/diagnostics';
 
 type Gpu = { requestAdapter(): Promise<{ features: { has(f: string): boolean }; limits: { maxStorageBuffersPerShaderStage: number } } | null> };
 
@@ -71,10 +72,12 @@ export const crashedOnLastRun: string | null = (() => {
 /** Runs `job` with the crash guard set for `key`. */
 export async function guarded<T>(key: string, job: () => Promise<T>): Promise<T> {
   store()?.setItem(RUNNING, key);
+  beginRisk(`ai:${key}`); // the black box reports a kill here on the next launch (D50)
   try {
     return await job();
   } finally {
     store()?.removeItem(RUNNING);
+    endRisk();
   }
 }
 
@@ -112,10 +115,15 @@ function spawn(key: string | null, device: Device): Live {
     if (m.type === 'progress') { p.onProgress?.(m.loaded, m.total); return; }
     pending.delete(m.id);
     if (m.type === 'done') p.resolve(m.result);
-    else p.reject(new Error(m.message));
+    else {
+      const err = new Error(m.message);
+      reportError(err, 'ai.run', { model: key, device });
+      p.reject(err);
+    }
   };
   worker.onerror = (e) => {
     const err = new Error(e.message || 'AI worker crashed');
+    reportError(err, 'ai.worker', { model: key, device });
     for (const [id, p] of pending) { pending.delete(id); p.reject(err); }
     if (live?.worker === worker) live = null;
   };
@@ -151,6 +159,7 @@ export async function run<T>(modelKey: string | null, job: Job, opts: { onProgre
           if (!pending.has(id)) return;
           pending.delete(id);
           if (live === w) releaseAi(); // stops a runaway generation
+          record('ai.timeout', { model: modelKey, job: job.type });
           reject(new Error('timeout'));
         }, opts.timeoutMs)
       : undefined;
@@ -159,6 +168,7 @@ export async function run<T>(modelKey: string | null, job: Job, opts: { onProgre
       reject: (e) => { clearTimeout(timer); reject(e); },
       onProgress: opts.onProgress,
     });
+    record('ai.job', { model: modelKey, job: job.type, device: dev });
     w.worker.postMessage({ ...job, id } as ToWorker);
   });
 }

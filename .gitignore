@@ -11,3 +11,8 @@ private/
 # copied from node_modules by scripts/copy-vendor.mjs
 public/vendor/
 *.tsbuildinfo
+# Secrets stay in ignored files. The Sentry DSN is public by design, so .env.production is committed.
+.env*
+!.env.example
+!.env.production
+.env.sentry-build-plugin

@@ -13,6 +13,7 @@ import { Header, ProgressBar, Segmented, Sheet, Switch, Toast } from '../ui/part
 import { Icon } from '../ui/icons';
 import type { AiTask } from '../domain/types';
 import { switchLanguage } from '../life/lang';
+import { sessionCode } from '../diag/diagnostics';
 import { ConfirmSheet, downloadBlob, formatBytes, LIcon, SheetHead, shareFile } from '../life/ui';
 
 const BODY = 'M93 50L93 62C86 66 74 66 69 71C64 75 62 80 61 84L38 126L16 172L10 188L16 196L24 192L27 175L49 131L73 98L80 140L74 178L77 270L80 352L74 366L72 374L93 376L92 362L90 352L95 272L100 205L105 272L110 352L108 362L107 376L128 374L126 366L120 352L123 270L126 178L120 140L127 98L151 131L173 175L176 192L184 196L190 188L184 172L162 126L139 84C138 80 136 75 131 71C126 66 114 66 107 62L107 50Z';
@@ -25,7 +26,7 @@ const TASKS: { task: AiTask; key: 'settings.task.cutout' | 'settings.task.pose' 
 const FONTS = ['Prata', 'Onest', 'Caveat'];
 const LIBRARIES: [string, string][] = [
   ['React', 'MIT'], ['Dexie', 'Apache-2.0'], ['fflate', 'MIT'], ['Transformers.js', 'Apache-2.0'],
-  ['ONNX Runtime Web', 'MIT'], ['MediaPipe Tasks Vision', 'Apache-2.0'], ['Workbox', 'MIT'], ['Vite PWA', 'MIT'],
+  ['ONNX Runtime Web', 'MIT'], ['MediaPipe Tasks Vision', 'Apache-2.0'], ['Workbox', 'MIT'], ['Vite PWA', 'MIT'], ['Sentry SDK', 'MIT'],
 ];
 const REPO = 'https://github.com/Nik-Kras/iMannequin';
 
@@ -274,6 +275,15 @@ export default function Settings() {
           </div>
           <input ref={fileInput} type="file" accept=".imannequin,.zip,application/zip,application/octet-stream" hidden
             onChange={(e) => void pickRestore(e.target.files?.[0])} />
+        </section>
+
+        <section className="card card--pad set-card" aria-labelledby="set-diag">
+          <div className="set-card__row">
+            <h2 id="set-diag" className="title-card grow">{t('settings.diagnostics')}</h2>
+            <Switch checked={settings.diagnostics} onChange={(v) => void updateSettings({ diagnostics: v })} label={<span className="sr-only">{t('settings.diagnostics')}</span>} />
+          </div>
+          <p className="set-text">{t('settings.diagnosticsText')}</p>
+          <p className="set-text set-text--ink" style={{ userSelect: 'all', WebkitUserSelect: 'all' }}>{t('settings.diagnosticsCode', { code: sessionCode() })}</p>
         </section>
 
         <section className="card set-card set-card--rows">

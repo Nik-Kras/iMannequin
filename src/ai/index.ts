@@ -10,6 +10,7 @@ import { MODEL_SPECS, chosenModel, spec as specOf } from './registry';
 import { PoseError, runPose } from './pose';
 import { searchDetailed } from './search';
 import type { CutoutOut } from './worker';
+import { record, reportError, risky } from '../diag/diagnostics';
 
 export interface CutoutResult {
   /** PNG with a transparent background, cropped to the garment with a small margin. */
@@ -168,6 +169,9 @@ export function detectPose(photo: Blob): Promise<PoseResult> {
 }
 
 async function pose(photo: Blob): Promise<PoseResult> {
+  // Tests stand in for MediaPipe with synthetic key points (R2: no real body photos in the repo).
+  const fake = (globalThis as { __imqFakePose?: (p: Blob) => Promise<PoseResult> }).__imqFakePose;
+  if (fake) return fake(photo);
   releaseAi(); // one AI model in memory at a time
   const settings = await getSettings();
   const chosen = chosenModel(settings, 'pose');
@@ -175,11 +179,13 @@ async function pose(photo: Blob): Promise<PoseResult> {
   let lastErr: unknown;
   for (const s of order) {
     try {
-      const r = await runPose(photo, s.source);
+      const r = await risky(`pose:${s.id}`, () => runPose(photo, s.source));
+      record('pose.done', { model: s.id, width: r.width, height: r.height, points: r.landmarks.length });
       return { ...r, model: s.id };
     } catch (err) {
       lastErr = err;
-      if (err instanceof PoseError && err.code === 'no-person') throw err;
+      if (err instanceof PoseError && err.code === 'no-person') { record('pose.noPerson', { model: s.id }); throw err; }
+      reportError(err, 'pose', { model: s.id });
     }
   }
   throw lastErr;

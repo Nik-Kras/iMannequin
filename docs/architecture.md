@@ -7,7 +7,7 @@ Legend: **Decided** = approved by the owner · **Proposed ⚑** = Claude's recom
 - **Progressive Web App (PWA)** (D1):
   - **iPhone** (Safari, iOS 26+): Share → *Add to Home Screen*.
   - **Android** (Chrome): *Install app*.
-- **No server, no accounts, no analytics** (R1).
+- **No server, no accounts, no analytics** (R1). Technical crash reports go to Sentry (D50, §12).
 - **Hosting:** GitHub Pages (D10). The site is built and deployed by a GitHub Actions workflow (`actions/deploy-pages`). The address is `https://nik-kras.github.io/iMannequin/`, so Vite's `base` is `/iMannequin/`.
 - The QR code in the README points to that address.
 
@@ -24,6 +24,7 @@ Legend: **Decided** = approved by the owner · **Proposed ⚑** = Claude's recom
 | Graphics | Canvas 2D for compositing, SVG for the paper UI | No chart or graphics library needed ⚑ |
 | Zip (backup) | `fflate` (MIT) ⚑ | Small and fast |
 | i18n | Typed `en` / `uk` dictionaries | Same approach as RHP |
+| Crash reports | `@sentry/react` + `@sentry/vite-plugin` (MIT), Sentry free plan | D50, §12. Same setup as RHP |
 | Tests | Vitest (pure logic) + Playwright on WebKit and Chromium (UI smoke) + real phones for models | Synthetic fixtures only (R2) |
 
 ## 3. Processing model
@@ -126,8 +127,9 @@ CalibrationRun { id, task, modelId, photos: number, msPerPhoto, editedRate, devi
 | App files (GitHub Pages) | Install and updates | Nothing personal |
 | Models (Hugging Face Hub, self-hosted MediaPipe) | First use of each model | Nothing personal |
 | Weather (Open-Meteo) | **Only when the user switches the weather hint on** (D25) | A location rounded to about 10 km (Q2) |
+| Crash reports (Sentry, EU) | When something fails, while Settings → Crash reports is on (default, D50) | Technical data only (§12) |
 
-There are no analytics, no error reporting service and no fonts from a CDN.
+There are no analytics and no fonts from a CDN.
 
 ## 10. Testing
 
@@ -159,3 +161,14 @@ src/
 public/          icons, manifest, models/ (small MediaPipe files)
 tests/           unit/, e2e/, fixtures/ (synthetic only)
 ```
+
+## 12. Diagnostics (D50)
+
+Set up like RHP, in `src/diag/`.
+
+- **Black box** (`blackbox.ts`, always on, stays on the phone): a short log of technical steps in `localStorage` (route, AI job, model, download, body-photo step, errors). Risky work (a model run, pose detection, body-photo processing) is wrapped in `risky()`. iPhone Safari kills a tab that runs out of memory without any error reaching the code, so a session that ended inside a risky step is reported on the next launch as "App was killed during …", with its log.
+- **Sentry** (`diagnostics.ts`, `@sentry/react`, project `imannequin` in the owner's EU org): unhandled errors, React render errors (React 19 error hooks in `main.tsx`, plus a last-resort error screen), errors passed to `reportError(err, where)`, and page-load / download traces. Starts 1.5 s after launch, only when Settings → Crash reports is on (the default). Playwright sessions don't report.
+- **Never sent:** photos, cut-outs, garment names, brands, places, notes, search text, the weather location (URL queries are stripped from breadcrumbs, spans and events), click text (no DOM breadcrumbs), session replays, the IP (`ip_address: null`). The user id is a random 4-letter install code; Settings shows the report code (`install-session`) so a report can be found.
+- **Check the setup:** open the app with `#sentry-test` and it throws one real error.
+- **Source maps:** uploaded by `@sentry/vite-plugin` when `SENTRY_AUTH_TOKEN` is set (the repo's Actions secret in CI, or a git-ignored `.env.sentry-build-plugin` locally), then deleted from `dist/` so they're never served. The DSN is public by design and lives in the committed `.env.production`.
+

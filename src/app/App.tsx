@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { I18nProvider, useI18n } from '../i18n';
 import { useSettings, ensureDefaultPlaces } from '../data/repo';
 import { getSettings } from '../data/db';
 import { startQueueRunner } from '../data/queue';
+import { record, setDiagnosticsEnabled, startDiagnostics } from '../diag/diagnostics';
 import { Toast } from '../ui/parts';
 import { TabBar } from './TabBar';
 import { navigate, useRoute, TAB_ROOTS } from './router';
@@ -71,6 +72,12 @@ function Shell() {
   const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW();
 
   useEffect(() => startQueueRunner(), []);
+  // Diagnostics start once the switch's value is known; flipping it applies immediately (D50).
+  useEffect(() => {
+    if (!settings) return;
+    void startDiagnostics(settings.diagnostics);
+    setDiagnosticsEnabled(settings.diagnostics);
+  }, [settings?.diagnostics, settings]);
   // Each screen opens at the top (the window keeps its scroll otherwise).
   useEffect(() => { window.scrollTo(0, 0); }, [route.path]);
   useEffect(() => { if (settings) document.documentElement.lang = settings.lang; }, [settings?.lang]);
@@ -102,12 +109,35 @@ function Shell() {
   );
 }
 
+/** Last-resort screen so a bug never leaves a blank page; the wardrobe is untouched. */
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error) {
+    // Sentry already gets it through React's onCaughtError hook (main.tsx); keep it in the black box too.
+    record('error render', { message: String(error.message).slice(0, 300) });
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="screen screen--no-tabs pad stack gap-16" style={{ justifyContent: 'center', minHeight: '100dvh' }}>
+        <h1 className="h1">Oops · Ой</h1>
+        <p className="body">Something went wrong. Your wardrobe is safe. · Щось пішло не так. Гардероб у безпеці.</p>
+        <p className="meta">{String(this.state.error.message).slice(0, 200)}</p>
+        <button type="button" className="btn btn--primary btn--block" onClick={() => location.reload()}>Restart · Перезапустити</button>
+      </div>
+    );
+  }
+}
+
 export default function App() {
   const settings = useSettings();
   return (
     <I18nProvider lang={settings?.lang ?? 'en'}>
       <div className="paper-bg" aria-hidden="true" />
-      <div className="app"><Shell /></div>
+      <div className="app"><ErrorBoundary><Shell /></ErrorBoundary></div>
     </I18nProvider>
   );
 }

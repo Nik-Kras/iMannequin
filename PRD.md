@@ -29,7 +29,7 @@ It's free, installs from a QR code on Android and iPhone, and runs entirely on t
 | Cost | Free. No paid services, accounts or fonts (R3). |
 | Install | A PWA from a QR code: Add to Home Screen on iPhone, Install in Chrome on Android (D1). |
 | Hosting | GitHub Pages from the public repo `Nik-Kras/iMannequin` (D10). |
-| Privacy | Photos never leave the phone. No server, no analytics. The only network use is downloading the app and the models, plus the weather hint if the user switches it on (R1, D25). |
+| Privacy | Photos never leave the phone. No server, no analytics. The only network use is downloading the app and the models, plus the weather hint if the user switches it on (R1, D25) and technical crash reports that can be switched off (D50). |
 | AI | Runs on the phone. Every result is an editable suggestion (R5). No image-generation models (D5). |
 | Offline | Everything works offline after the first launch and the model download (R4). |
 | Licences | Repo is MIT. Every model and library has a permissive licence (R3, R8). |

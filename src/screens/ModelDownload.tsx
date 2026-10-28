@@ -9,6 +9,7 @@ import { updateSettings } from '../data/db';
 import { Icon } from '../ui/icons';
 import { Stamp } from '../ui/parts';
 import { chosenModel, downloadModel, downloadSize, effectiveModel, isDownloaded, type ModelSpec } from '../ai';
+import { reportError } from '../diag/diagnostics';
 import { AiIcon, useSize } from '../ai/ui';
 
 type RowState = { done: number; total: number; ready: boolean };
@@ -76,7 +77,8 @@ export default function ModelDownload() {
         setRows((r) => ({ ...r, [m.id]: { ...r[m.id], done: r[m.id].total, ready: true } }));
       }
       setPhase('done');
-    } catch {
+    } catch (err) {
+      if (!ctl.signal.aborted) reportError(err, 'models.download');
       setPhase(ctl.signal.aborted ? 'paused' : 'error');
     }
   }

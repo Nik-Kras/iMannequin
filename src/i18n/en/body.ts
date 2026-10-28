@@ -47,6 +47,8 @@ export default {
   'body.part.feet': 'feet',
   'body.part.body': 'body',
   'body.use': 'Use this photo',
+  'body.saving': 'Saving…',
+  'body.saveFailed': 'We couldn’t save the photo. Tap “Use this photo” again; if it keeps failing, restart the app.',
   'body.retake': 'Retake',
   'body.failed': 'We couldn’t read this photo. Try again, or choose another one.',
   'body.ready': 'Your mannequin is ready.',

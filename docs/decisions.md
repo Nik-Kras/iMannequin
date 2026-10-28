@@ -6,7 +6,7 @@ Rule: the owner approves every naming, design, feature and stack decision. Claud
 
 | # | Rule |
 |---|---|
-| R1 | **Photos never leave the phone.** There's no server and no analytics. The only network use is downloading the app and the models. The single exception is the weather hint (D25), and only after the user switches it on. |
+| R1 | **Photos never leave the phone.** There's no server and no analytics. The only network use is downloading the app and the models. The exceptions are the weather hint (D25), only after the user switches it on, and technical crash reports (D50), which carry no photos or personal data and can be switched off. |
 | R2 | **Nothing personal goes in the public repo.** No real photos of people or their clothes in code, tests, screenshots or issues. Tests and README screenshots use synthetic or public-domain images. |
 | R3 | **Everything is free.** No paid services, accounts or fonts. Models and libraries must have permissive licences (MIT, Apache or BSD). For example, BRIA's background-removal models are non-commercial only, so they're out. |
 | R4 | **Works offline** after the first launch (and after the models have been downloaded). |
@@ -68,6 +68,7 @@ Rule: the owner approves every naming, design, feature and stack decision. Claud
 | D47 | 2026-10-28 | Install guide: Like RHP: when the app is opened in a browser tab, it shows how to add it to the home screen (Safari: Share → Add to Home Screen; Chrome: Install). Resolves Q16 | n/a | Owner accepted the recommendation |
 | D48 | 2026-10-28 | Outline mode: keep the original body photo: **Keep it**, so switching back works, and offer **Delete original photo** in Settings. Resolves Q17 | delete it as soon as outline is chosen | Owner accepted the recommendation |
 | D49 | 2026-10-28 | Dress-up's clothes row shows **cards**. The hanger rail stays a canvas idea only | Hangers on a rail | Owner's choice |
+| D50 | 2026-10-28 | **Crash reports with Sentry**, set up like RHP: errors, failed steps and iOS out-of-memory kills (an on-phone black box reports them on the next launch) go to the owner's Sentry project `imannequin` (free plan, EU region). **On by default, with a switch in Settings → Crash reports.** Technical data only: the step, the error, the phone, iOS and GPU. Never photos, cut-outs, garment names, brands, places, notes or the weather location; no click recording, no session replay, IP not stored. Source maps are uploaded at build time and never served. Amends R1 and the "no error reporting" rule ([architecture §12](architecture.md#12-diagnostics-d50)) | Off by default (like the weather hint); no reporting | Owner asked for it after "Use this photo" silently did nothing on the iPhone, so failures on the phone become visible |
 
 ## Open questions
 

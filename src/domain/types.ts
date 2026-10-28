@@ -168,6 +168,8 @@ export interface AppSettings {
   onboarded: boolean;
   modelsReady: boolean;
   installGuideDismissed: boolean;
+  /** Crash reports to Sentry (D50): technical data only, on by default, switchable in Settings. */
+  diagnostics: boolean;
   lastBackupAt?: number;
   backupReminderAt?: number;
   draft: OutfitDraft;

@@ -2,6 +2,7 @@
 // the Hub URL), streamed to disk with real progress and without loading the model into memory.
 import { deviceFor } from './client';
 import { hfUrl, modelBytes, spec as specOf, type Device, type ModelSpec } from './registry';
+import { record } from '../diag/diagnostics';
 
 const CACHE = 'transformers-cache';
 
@@ -62,6 +63,7 @@ export async function downloadModel(modelId: string, onProgress?: (done: number,
   const device = await deviceFor(s);
   const files = filesOf(s, device);
   const total = files.reduce((a, [, n]) => a + n, 0);
+  record('download.start', { model: modelId, device, mb: Math.round(total / 1048576) });
   let done = 0;
   for (const [file, size] of files) {
     const url = hfUrl(s.source, file);
@@ -92,6 +94,7 @@ export async function downloadModel(modelId: string, onProgress?: (done: number,
     done = base + size;
     onProgress?.(done, total);
   }
+  record('download.done', { model: modelId, device });
 }
 
 /** Removes a model's files from the cache (both devices' variants). */

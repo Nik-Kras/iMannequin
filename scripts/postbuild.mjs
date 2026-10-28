@@ -7,4 +7,8 @@ let removed = 0;
 for (const f of await readdir(new URL('assets/', dist))) {
   if (/^ort-wasm-.*\.(wasm|mjs)$/.test(f)) { await rm(new URL(`assets/${f}`, dist)); removed++; }
 }
-console.log(`postbuild: removed ${removed} unused runtime file(s)`);
+// Source maps go to Sentry only (uploaded by the Vite plugin); never serve them publicly.
+for (const f of await readdir(dist, { recursive: true })) {
+  if (f.endsWith('.map')) { await rm(new URL(f, dist)); removed++; }
+}
+console.log(`postbuild: removed ${removed} unused runtime or source-map file(s)`);

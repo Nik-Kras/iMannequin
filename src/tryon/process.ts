@@ -1,7 +1,8 @@
 // Body photo → canonical body record (try-on §2.2): key points and person mask from the AI module, the pose check,
 // then the photo straightened and scaled onto the 1000 × 2000 canvas, cut out, measured and stored.
 import { detectPose, PoseError } from '../ai';
-import { db } from '../data/db';
+import { db, inMemory, withReopen } from '../data/db';
+import { describeError, record } from '../diag/diagnostics';
 import type { BodyRecord, Landmark } from '../domain/types';
 import { canonicalLandmarks, canonicalTransform, checkPose, bodyMetrics, metricsToRecord, CANON, LM, type PoseIssue } from './body';
 import { ctx2d, makeCanvas, maskFromImageData } from './assets';
@@ -85,5 +86,8 @@ export async function processBodyPhoto(photo: Blob): Promise<{ body?: BodyRecord
 
 /** Stores the body record (the user accepted it on the Check screen). Garment fits refit automatically (try-on §5). */
 export async function saveBodyRecord(body: BodyRecord): Promise<void> {
-  await db.body.put(body);
+  const [photo, cutout, mask] = await Promise.all([inMemory(body.photo), inMemory(body.cutout), inMemory(body.mask)]);
+  record('body.save', { photoKb: Math.round(photo.size / 1024), cutoutKb: Math.round(cutout.size / 1024), maskKb: Math.round(mask.size / 1024) });
+  const rec: BodyRecord = { ...body, photo, cutout, mask };
+  await withReopen(() => db.body.put(rec), (err) => record('body.save.retry', describeError(err)));
 }

@@ -6,6 +6,7 @@ import { liveQuery } from 'dexie';
 import { db, getSettings, newId } from './db';
 import type { CutoutResult, GarmentAnalysis, SearchHit } from '../ai';
 import type { CategoryId, ColourName, Item, ItemSuggestion, Lang, Photo, QueueJob } from '../domain/types';
+import { reportError } from '../diag/diagnostics';
 import { autoName } from '../wardrobe/naming';
 
 export interface QueueDeps {
@@ -104,6 +105,7 @@ export async function processNextJob(deps: QueueDeps = defaultDeps): Promise<boo
     });
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
+    reportError(e, 'queue.job');
     await db.queue.update(job.id, { state: 'failed', error });
   }
   return true;

@@ -79,7 +79,7 @@ Everything runs in the browser on the phone: React and TypeScript, IndexedDB for
 
 ## Privacy
 
-- **Your photos never leave your phone.** There's no server, no account and no analytics.
+- **Your photos never leave your phone.** There's no server, no account and no analytics. Crash reports carry technical data only and can be switched off in Settings.
 - The only network traffic is downloading the app and its AI models. The one exception is the weather hint, and only if you switch it on: it sends a location to the free Open-Meteo service.
 - Deleting the app deletes your wardrobe, so the app makes backup files you keep yourself (iCloud Drive, Google Drive, anywhere).
 

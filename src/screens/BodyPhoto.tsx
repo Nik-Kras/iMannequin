@@ -2,7 +2,8 @@
 // when the browser allows it) or the gallery, then the check screen with the key points drawn over the cut-out.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { goBack, navigate, useRoute } from '../app/router';
-import { updateSettings } from '../data/db';
+import { updateSettings, withReopen } from '../data/db';
+import { record, reportError, risky } from '../diag/diagnostics';
 import type { BodyRecord } from '../domain/types';
 import { useI18n, type Key } from '../i18n';
 import { armAngles, DESIGN_BODY_PATH, DESIGN_HEAD, processBodyPhoto, saveBodyRecord, type PoseIssue } from '../tryon';
@@ -28,17 +29,23 @@ export default function BodyPhoto() {
   const [step, setStep] = useState<Step>('guide');
   const [photo, setPhoto] = useState<Blob>();
   const [result, setResult] = useState<{ body?: BodyRecord; issues: PoseIssue[] }>();
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const gallery = useRef<HTMLInputElement>(null);
   const capture = useRef<HTMLInputElement>(null);
 
   const run = async (blob: Blob) => {
     setPhoto(blob);
+    setSaveFailed(false);
     setStep('processing');
+    record('body.process', { kb: Math.round(blob.size / 1024), type: blob.type || 'none' });
     try {
-      const r = await processBodyPhoto(blob);
+      const r = await risky('body.process', () => processBodyPhoto(blob));
+      record('body.checked', { body: !!r.body, issues: r.issues.map((i) => i.code).join(',') || 'none' });
       setResult(r);
       setStep('check');
-    } catch {
+    } catch (err) {
+      reportError(err, 'body.process');
       setStep('error');
     }
   };
@@ -51,14 +58,22 @@ export default function BodyPhoto() {
   const retake = () => { setResult(undefined); setPhoto(undefined); setStep('guide'); };
   const finish = async () => {
     if (onboarding) {
-      await updateSettings({ onboarded: true });
+      await withReopen(() => updateSettings({ onboarded: true }));
       navigate('/dressup', { replace: true });
     } else goBack('/settings');
   };
   const use = async () => {
-    if (!result?.body) return;
-    await saveBodyRecord(result.body);
-    await finish();
+    if (!result?.body || saving) return;
+    setSaving(true);
+    setSaveFailed(false);
+    try {
+      await saveBodyRecord(result.body);
+      await finish();
+    } catch (err) {
+      reportError(err, 'body.save');
+      setSaveFailed(true);
+      setSaving(false);
+    }
   };
 
   const inputs = (
@@ -133,6 +148,7 @@ export default function BodyPhoto() {
           {step === 'error' ? (
             <p className="bp__issue" role="alert"><Icon name="warning" size={20} />{t('body.failed')}</p>
           ) : result && <CheckList result={result} />}
+          {saveFailed && <p className="bp__issue" role="alert"><Icon name="warning" size={20} />{t('body.saveFailed')}</p>}
         </div>
       )}
 
@@ -151,7 +167,9 @@ export default function BodyPhoto() {
         {checkStep && (
           <>
             {result?.body && result.issues.length === 0 && (
-              <button type="button" className="btn btn--primary btn--block bp__primary" onClick={() => void use()}>{t('body.use')}</button>
+              <button type="button" className="btn btn--primary btn--block bp__primary" aria-busy={saving} disabled={saving} onClick={() => void use()}>
+                {saving ? <><span className="spinner spinner--on-ink" aria-hidden="true" />{t('body.saving')}</> : t('body.use')}
+              </button>
             )}
             <button type="button" className={`btn btn--block ${result?.body && result.issues.length === 0 ? 'btn--secondary' : 'btn--primary bp__primary'}`} onClick={retake}>
               {t('body.retake')}

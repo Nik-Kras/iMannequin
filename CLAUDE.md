@@ -9,7 +9,7 @@ A free PWA (Android + latest iPhone) that turns a body photo into a paper-doll m
 
 ## Rules
 - **Propose, don't decide.** Names, design, features, stack and pivots need the owner's approval. Never add a feature that wasn't asked for; suggest it instead.
-- **Photos never leave the phone (R1).** No server, analytics, error reporting or CDN fonts. The only allowed requests are app files, model downloads and, when the user switches it on, the weather hint.
+- **Photos never leave the phone (R1).** No server, analytics or CDN fonts. The only allowed requests are app files, model downloads, the weather hint when the user switches it on, and technical crash reports to Sentry (D50: never photos, garment names, brands, places, notes or locations; switchable in Settings).
 - **Nothing personal in this public repo (R2).** No real photos of people or their clothes in code, tests, fixtures, screenshots or issues. Use synthetic or public-domain images and record their licence next to them.
 - **Free and permissive (R3).** No paid services, accounts or fonts. Check a model's or library's licence (MIT / Apache / BSD) before adding it, and note it in `docs/architecture.md`.
 - **Offline after first launch (R4).**

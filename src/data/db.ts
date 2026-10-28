@@ -41,6 +41,30 @@ export class IMannequinDB extends Dexie {
 
 export const db = new IMannequinDB();
 
+/**
+ * Runs a write, and once more after reopening the database if the connection was lost. iOS drops the
+ * IndexedDB connection of a page that was in the background (the camera or photo picker was open):
+ * "UnknownError: Connection to Indexed Database server lost".
+ */
+export async function withReopen<T>(write: () => Promise<T>, onRetry?: (err: unknown) => void): Promise<T> {
+  try {
+    return await write();
+  } catch (err) {
+    const name = (err as { name?: string })?.name ?? '';
+    const inner = (err as { inner?: { name?: string } })?.inner?.name ?? '';
+    if (![name, inner].some((n) => ['UnknownError', 'InvalidStateError', 'DatabaseClosedError'].includes(n))) throw err;
+    onRetry?.(err);
+    db.close({ disableAutoOpen: false });
+    await db.open();
+    return write();
+  }
+}
+
+/** Copies a Blob's bytes into memory. WebKit can fail to store a Blob backed by a picked file or a canvas. */
+export async function inMemory(b: Blob): Promise<Blob> {
+  return new Blob([await b.arrayBuffer()], { type: b.type || 'application/octet-stream' });
+}
+
 export const newId = (): string =>
   (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
@@ -55,6 +79,7 @@ export function defaultSettings(lang: AppSettings['lang'] = 'en'): AppSettings {
     onboarded: false,
     modelsReady: false,
     installGuideDismissed: false,
+    diagnostics: true,
     draft: { slots: {}, accessories: [], toggles: { tuckIn: false, intoBoots: false } },
   };
 }
