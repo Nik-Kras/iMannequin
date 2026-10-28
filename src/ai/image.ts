@@ -6,7 +6,12 @@ export async function toBitmap(blob: Blob): Promise<ImageBitmap> {
   try {
     return await createImageBitmap(blob, { imageOrientation: 'from-image' });
   } catch {
-    return createImageBitmap(blob);
+    try {
+      return await createImageBitmap(blob);
+    } catch (err) {
+      // The queue tells the user to take this photo again (bug-audit #16).
+      throw Object.assign(new Error(`The photo could not be decoded (${(err as Error)?.name ?? 'error'})`), { code: 'unreadable' });
+    }
   }
 }
 

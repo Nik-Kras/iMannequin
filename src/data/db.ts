@@ -1,7 +1,7 @@
 // IndexedDB via Dexie. Everything stays on the phone (R1); backup.ts exports it to a file (R6).
 import Dexie, { type Table } from 'dexie';
 import type {
-  AppSettings, BodyRecord, CalibrationRun, GarmentAnchors, Item, Location, Outfit, Photo, QueueJob, Trip, WearEntry,
+  AppSettings, BodyRecord, CalibrationRun, GarmentAnchors, Item, Location, Outfit, Photo, QueueCut, QueueJob, QueuePhoto, Trip, WearEntry,
 } from '../domain/types';
 
 /** Garment anchors cached per photo. Kept apart from Photo so caching them never rewrites a record
@@ -20,6 +20,8 @@ export class IMannequinDB extends Dexie {
   settings!: Table<AppSettings, string>;
   calibration!: Table<CalibrationRun, string>;
   anchors!: Table<AnchorCache, string>;
+  queuePhotos!: Table<QueuePhoto, string>;
+  queueCuts!: Table<QueueCut, string>;
 
   constructor(name = 'imannequin') {
     super(name);
@@ -36,6 +38,11 @@ export class IMannequinDB extends Dexie {
       calibration: 'id, task, modelId, createdAt',
     });
     this.version(2).stores({ anchors: 'photoId' });
+    // Queue photos and cut-outs in their own write-once tables, so a job's state changes never rewrite a Blob
+    // (bug-audit #1). Older queue records keep their `blob` until the runner moves it (queue.ts, moveLegacyPhotos):
+    // copying a Blob needs an await, which would end this upgrade transaction, and one unreadable photo here
+    // would stop the whole database from opening.
+    this.version(3).stores({ queuePhotos: 'jobId', queueCuts: 'jobId' });
   }
 }
 

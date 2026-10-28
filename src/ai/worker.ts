@@ -20,14 +20,16 @@ export type ToWorker =
   | { type: 'embed-image'; id: number; blob: Blob; spec: ModelSpec }
   | { type: 'embed-text'; id: number; texts: string[]; spec: ModelSpec }
   | { type: 'generate'; id: number; spec: ModelSpec; messages: Msgs; maxTokens: number }
-  | { type: 'describe'; id: number; blob: Blob; spec: ModelSpec };
+  | { type: 'describe'; id: number; blob: Blob; spec: ModelSpec }
+  /** Free every model and the GPU device; the client terminates the worker after the answer (bug-audit #6). */
+  | { type: 'dispose'; id: number };
 
 export interface CutoutOut { png: Blob; width: number; height: number; confidence: number; reasons: string[]; clean: boolean; crop?: { x: number; y: number; w: number; h: number } }
 
 export type FromWorker =
   | { type: 'progress'; id: number; loaded: number; total: number }
   | { type: 'done'; id: number; result: unknown }
-  | { type: 'error'; id: number; message: string };
+  | { type: 'error'; id: number; message: string; code?: string };
 
 type TF = typeof import('@huggingface/transformers');
 let T: TF | null = null;
@@ -263,14 +265,46 @@ async function describe(id: number, blob: Blob, spec: ModelSpec): Promise<string
   return String(result[task] ?? '').trim();
 }
 
+// ---- Letting go (bug-audit #6) ----
+// Terminating a worker that still holds an ONNX Runtime WebGPU session kills the WebKit page about 1.5 s later.
+// Before the client terminates this worker, every session is released and the GPU device destroyed.
+
+/** Disposes every distinct loaded model (a pipeline, or a { model } pair). Returns how many were disposed. */
+export async function disposeModels(models: Iterable<Promise<unknown>>): Promise<number> {
+  const seen = new Set<unknown>();
+  for (const p of models) {
+    try {
+      const m = (await p) as { dispose?: () => unknown; model?: { dispose?: () => unknown } } | null;
+      const target = typeof m?.dispose === 'function' ? m : m?.model;
+      if (!target || seen.has(target) || typeof target.dispose !== 'function') continue;
+      seen.add(target);
+      await target.dispose();
+    } catch { /* a model that failed to load or to free: the terminate takes the rest */ }
+  }
+  return seen.size;
+}
+
+async function disposeAll(): Promise<void> {
+  const models = [...loaded.values()];
+  loaded.clear();
+  const n = await disposeModels(models);
+  // The device getter creates a device when no session made one, so only ask after a WebGPU model ran.
+  if (!n || device !== 'webgpu' || !T) return;
+  try {
+    const gpu = (T.env.backends.onnx as unknown as { webgpu?: { device?: Promise<{ destroy?: () => void }> } }).webgpu;
+    (await gpu?.device)?.destroy?.();
+  } catch { /* no device to free */ }
+}
+
 const post = (m: FromWorker, transfer: Transferable[] = []) => self.postMessage(m, transfer);
 
-self.onmessage = async (e: MessageEvent<ToWorker>) => {
+const onMessage = async (e: MessageEvent<ToWorker>) => {
   const m = e.data;
   if (m.type === 'init') { device = m.device; return; }
   try {
     let result: unknown;
     switch (m.type) {
+      case 'dispose': await disposeAll(); result = true; break;
       case 'plain': result = await plain(m.blob, m.force); break;
       case 'segment': result = await segment(m.id, m.blob, m.spec); break;
       case 'colours': result = await colours(m.blob); break;
@@ -282,6 +316,9 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     }
     post({ type: 'done', id: m.id, result });
   } catch (err) {
-    post({ type: 'error', id: m.id, message: String((err as Error)?.message ?? err) });
+    const code = (err as { code?: unknown })?.code;
+    post({ type: 'error', id: m.id, message: String((err as Error)?.message ?? err), ...(typeof code === 'string' ? { code } : {}) });
   }
 };
+// Unit tests import this file for disposeModels outside a worker.
+if (typeof self !== 'undefined') self.onmessage = onMessage;

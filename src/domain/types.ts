@@ -152,12 +152,32 @@ export type QueueError = 'no-garment' | 'models' | 'network' | 'storage' | 'phot
 export interface QueueJob {
   id: string;
   kind: 'garment';
-  blob: Blob;
+  /** Only in records from before database v3; the photo bytes now live in QueuePhoto (bug-audit #1). */
+  blob?: Blob;
   state: QueueState;
   error?: string;
   errorCode?: QueueError;
   itemId?: string;
   createdAt: number;
+  /** The cut-out is stored (QueueCut) and the job waits for the analysis step (bug-audit #6). */
+  cut?: boolean;
+}
+
+/** A queued photo's bytes, written once and never rewritten (bug-audit #1). */
+export interface QueuePhoto {
+  jobId: string;
+  blob: Blob;
+  /** About 96 px, for the queue strip and the inbox (bug-audit #11). */
+  preview?: Blob;
+}
+
+/** A queued photo's cut-out, waiting for the analysis step. Written once. */
+export interface QueueCut {
+  jobId: string;
+  cutout: Blob;
+  width: number;
+  height: number;
+  model: string;
 }
 
 export type AiTask = 'cutout' | 'classify' | 'search' | 'describe' | 'pose';

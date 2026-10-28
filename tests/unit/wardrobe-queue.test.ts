@@ -113,11 +113,13 @@ describe('processing queue', () => {
     await waitFor(async () => gates.length === 1);
     expect(await states()).toEqual(['working', 'waiting']);
     gates.shift()!();
+    // A batch cuts every waiting photo out before analysing any (bug-audit #6): the first stays 'working'.
     await waitFor(async () => gates.length === 1);
-    expect(await states()).toEqual(['done', 'working']);
+    expect(await states()).toEqual(['working', 'working']);
     await enqueuePhotos([photo('3')]);
     gates.shift()!();
     await waitFor(async () => gates.length === 1);
+    expect(await states()).toEqual(['done', 'done', 'working']);
     gates.shift()!();
     await waitFor(async () => (await states()).every((s) => s === 'done'));
     expect(peak).toBe(1);

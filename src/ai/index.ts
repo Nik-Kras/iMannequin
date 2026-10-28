@@ -6,7 +6,8 @@ import { db, getSettings } from '../data/db';
 import { deviceFor, exclusive, failKey, guarded, isNetworkError, releaseAi, run } from './client';
 import { decideSameItem, cosine, SAME_ITEM_THRESHOLD } from './classify';
 import { analyseWith, unusableHere, usableModel, withModel } from './embed';
-import { MODEL_SPECS, chosenModel, spec as specOf } from './registry';
+import { MODEL_SPECS, chosenModel, spec as specOf, type ModelSpec } from './registry';
+import { isDownloaded } from './downloads';
 import { PoseError, runPose } from './pose';
 import { searchDetailed } from './search';
 import type { CutoutOut } from './worker';
@@ -59,6 +60,10 @@ export interface ModelInfo {
 
 const now = () => performance.now();
 
+/** Error tags the queue turns into a message and an action (QueueError, bug-audit #16). */
+const tagged = (message: string, code: 'no-garment' | 'models' | 'network') => Object.assign(new Error(message), { code });
+const noGarment = () => tagged('No garment found in the photo', 'no-garment');
+
 /**
  * Cuts the garment out of a flat-lay photo. Tries the plain-background fast path first, then the chosen model.
  * With `opts.model` (Fix cut-out → try another model) only that model runs; 'plain-bg' always returns its result.
@@ -77,7 +82,7 @@ async function cutOut(photo: Blob, opts?: { model?: string }): Promise<CutoutRes
   if (!asked || asked.id === 'plain-bg') {
     plain = await run<CutoutOut | null>(null, { type: 'plain', blob: photo, force: asked?.id === 'plain-bg' });
     if (plain?.clean || (asked && plain)) return done(plain!, 'plain-bg');
-    if (asked) throw new Error('No garment found in the photo');
+    if (asked) throw noGarment();
   }
 
   if (asked && (await unusableHere(asked)) === 'device') throw new Error(`${asked.label} needs WebGPU`);
@@ -86,13 +91,15 @@ async function cutOut(photo: Blob, opts?: { model?: string }): Promise<CutoutRes
     // The user chose "Plain background" in the Model lab: no model, take the plain result as it is.
     const forced = await run<CutoutOut | null>(null, { type: 'plain', blob: photo, force: true });
     if (forced) return done(forced, 'plain-bg');
-    throw new Error('No garment found in the photo');
+    throw noGarment();
   }
   let lastErr: unknown = null;
+  let lastModel: ModelSpec | null = null;
   // The chosen model, then the next candidates when one fails on this phone (each failure is remembered).
   for (let attempt = 0; attempt < 3; attempt++) {
     const model = asked ?? (await usableModel(settings, 'cutout'));
     if (!model) break;
+    lastModel = model;
     try {
       const device = await deviceFor(model);
       const key = failKey(model.id, device);
@@ -108,7 +115,11 @@ async function cutOut(photo: Blob, opts?: { model?: string }): Promise<CutoutRes
   // No model could run (offline before the download, or every candidate failed): the plain result, if any.
   const fallback = await run<CutoutOut | null>(null, { type: 'plain', blob: photo, force: true });
   if (fallback) return done(fallback, 'plain-bg');
-  throw lastErr ?? new Error('No garment found in the photo');
+  if (lastErr && lastModel && isNetworkError(lastErr)) {
+    // Offline: either the model was never downloaded, or the connection dropped while it loaded.
+    throw tagged(String((lastErr as Error)?.message ?? lastErr), (await isDownloaded(lastModel.id)) ? 'network' : 'models');
+  }
+  throw lastErr ?? noGarment();
 }
 
 /** Category (top-3), colours, seasons and an image embedding for a cut-out. */
@@ -172,7 +183,7 @@ async function pose(photo: Blob): Promise<PoseResult> {
   // Tests stand in for MediaPipe with synthetic key points (R2: no real body photos in the repo).
   const fake = (globalThis as { __imqFakePose?: (p: Blob) => Promise<PoseResult> }).__imqFakePose;
   if (fake) return fake(photo);
-  releaseAi(); // one AI model in memory at a time
+  await releaseAi(); // one AI model in memory at a time
   const settings = await getSettings();
   const chosen = chosenModel(settings, 'pose');
   const order = [chosen, ...MODEL_SPECS.filter((m) => m.task === 'pose' && m.id !== chosen.id)];
@@ -205,6 +216,11 @@ export { searchDetailed as searchWardrobeDetailed, type SearchOptions, type Sear
 export { effectiveModel, unusableHere } from './embed';
 export { PoseError } from './pose';
 export { releaseAi, crashedOnLastRun, resetFailures, failedModels, detectDevice } from './client';
+
+/** Frees the AI model once the work queued before this call is done (the garment queue is idle, bug-audit #8). */
+export function releaseAiWhenIdle(): Promise<void> {
+  return exclusive(() => releaseAi());
+}
 export { isDownloaded, downloadModel, deleteDownload, remainingBytes, downloadSize } from './downloads';
 export { MODEL_SPECS, ONBOARDING_MODELS, chosenModel, defaultModel, specsFor, formatMb, type ModelSpec } from './registry';
 export { parseQuery, needsLanguageModel } from './query';

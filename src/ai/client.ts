@@ -71,6 +71,10 @@ export const crashedOnLastRun: string | null = (() => {
 
 /** Runs `job` with the crash guard set for `key`. */
 export async function guarded<T>(key: string, job: () => Promise<T>): Promise<T> {
+  // A worker holding another model is let go first, under that model's name, so a crash while it is freed is
+  // never blamed on this one (bug-audit #6: an ORMBG crash was blamed on CLIP).
+  if (live && live.key !== null && live.key !== key) await releaseAi();
+  else await releasing;
   store()?.setItem(RUNNING, key);
   beginRisk(`ai:${key}`); // the black box reports a kill here on the next launch (D50)
   try {
@@ -98,14 +102,21 @@ export function exclusive<T>(job: () => Promise<T>): Promise<T> {
 
 export type Progress = (loaded: number, total: number) => void;
 type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
-type Job = DistributiveOmit<Exclude<ToWorker, { type: 'init' }>, 'id'>;
+type Job = DistributiveOmit<Exclude<ToWorker, { type: 'init' | 'dispose' }>, 'id'>;
 
-interface Live { worker: Worker; key: string | null; device: Device }
+/**
+ * Which part of a model a worker holds. A CLIP model's text half only computes the prompt embeddings (once per
+ * phone, then cached), so it never shares a worker with the image half (bug-audit #8).
+ */
+type Part = 'main' | 'text';
+const partOf = (job: Job): Part => (job.type === 'embed-text' ? 'text' : 'main');
+
+interface Live { worker: Worker; key: string | null; part: Part; device: Device }
 let live: Live | null = null;
 let nextId = 1;
 const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; onProgress?: Progress }>();
 
-function spawn(key: string | null, device: Device): Live {
+function spawn(key: string | null, device: Device, part: Part): Live {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
   worker.postMessage({ type: 'init', device } satisfies ToWorker);
   worker.onmessage = (e: MessageEvent<FromWorker>) => {
@@ -116,7 +127,8 @@ function spawn(key: string | null, device: Device): Live {
     pending.delete(m.id);
     if (m.type === 'done') p.resolve(m.result);
     else {
-      const err = new Error(m.message);
+      // The worker tags errors the queue explains to the user, e.g. a photo that can't be decoded (bug-audit #16).
+      const err = Object.assign(new Error(m.message), m.code ? { code: m.code } : {});
       reportError(err, 'ai.run', { model: key, device });
       p.reject(err);
     }
@@ -127,38 +139,89 @@ function spawn(key: string | null, device: Device): Live {
     for (const [id, p] of pending) { pending.delete(id); p.reject(err); }
     if (live?.worker === worker) live = null;
   };
-  return { worker, key, device };
+  return { worker, key, part, device };
 }
 
-/** Frees the model's memory. It reloads from the browser cache next time. */
-export function releaseAi(): void {
-  if (!live) return;
-  live.worker.terminate();
-  for (const [id, p] of pending) { pending.delete(id); p.reject(new Error('released')); }
-  live = null;
+/** How long a worker gets to free its model before it is terminated anyway. */
+export const DISPOSE_TIMEOUT_MS = 5000;
+let releasing: Promise<void> = Promise.resolve();
+
+/**
+ * Frees the model's memory. It reloads from the browser cache next time. Resolves once the worker is gone:
+ * the worker first disposes its sessions and the GPU device, because terminating a worker that still holds an
+ * ONNX Runtime WebGPU session kills the WebKit page (bug-audit #6).
+ */
+export function releaseAi(): Promise<void> {
+  const old = live;
+  if (old) {
+    live = null;
+    for (const [id, p] of pending) { pending.delete(id); p.reject(new Error('released')); }
+    releasing = releasing.then(() => retire(old));
+  }
+  return releasing;
+}
+
+async function retire(old: Live): Promise<void> {
+  // If the page dies while the model is freed, that model is the one to blame.
+  const s = store();
+  const before = s?.getItem(RUNNING) ?? null;
+  if (old.key) s?.setItem(RUNNING, old.key);
+  try {
+    await dispose(old.worker);
+  } finally {
+    old.worker.terminate();
+    if (old.key) {
+      if (before) s?.setItem(RUNNING, before);
+      else s?.removeItem(RUNNING);
+    }
+  }
+}
+
+/** Asks the worker to free its models; resolves when it answers, or after DISPOSE_TIMEOUT_MS (a busy or broken worker). */
+function dispose(worker: Worker): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const id = nextId++;
+    const finish = () => {
+      clearTimeout(timer);
+      worker.removeEventListener('message', onMessage);
+      resolve();
+    };
+    const onMessage = (e: MessageEvent<FromWorker>) => { if (e.data?.id === id) finish(); };
+    const timer = setTimeout(finish, DISPOSE_TIMEOUT_MS);
+    worker.addEventListener('message', onMessage);
+    try {
+      worker.postMessage({ type: 'dispose', id } satisfies ToWorker);
+    } catch {
+      finish();
+    }
+  });
 }
 
 /**
- * Sends a job to a worker that holds `modelKey` (null = any worker will do), terminating a worker
- * that holds a different model first: one AI model in memory at a time.
+ * Sends a job to a worker that holds `modelKey` (null = any worker will do), releasing a worker that holds a
+ * different model (or the other part of this one) first: one AI model in memory at a time.
  */
 export async function run<T>(modelKey: string | null, job: Job, opts: { onProgress?: Progress; timeoutMs?: number } = {}): Promise<T> {
   const device = await detectDevice();
   const dev = modelKey?.endsWith('@wasm') ? 'wasm' : modelKey?.endsWith('@webgpu') ? 'webgpu' : device;
-  if (!live || (modelKey !== null && live.key !== modelKey && live.key !== null) || (modelKey !== null && live.device !== dev)) {
-    releaseAi();
-    live = spawn(modelKey, dev);
-  } else if (modelKey !== null && live.key === null) {
-    live.key = modelKey; // a model-free worker takes the model
+  const part = partOf(job);
+  const other = (l: Live) => modelKey !== null && (l.device !== dev || (l.key !== null && (l.key !== modelKey || l.part !== part)));
+  let w = live;
+  if (!w || other(w)) {
+    await releaseAi();
+    w = live && !other(live) ? live : (live = spawn(modelKey, dev, part));
   }
-  const w = live;
+  if (modelKey !== null && w.key === null) {
+    w.key = modelKey; // a model-free worker takes the model
+    w.part = part;
+  }
   const id = nextId++;
   return new Promise<T>((resolve, reject) => {
     const timer = opts.timeoutMs
       ? setTimeout(() => {
           if (!pending.has(id)) return;
           pending.delete(id);
-          if (live === w) releaseAi(); // stops a runaway generation
+          if (live === w) void releaseAi(); // stops a runaway generation
           record('ai.timeout', { model: modelKey, job: job.type });
           reject(new Error('timeout'));
         }, opts.timeoutMs)

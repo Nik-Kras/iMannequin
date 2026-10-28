@@ -110,12 +110,16 @@ export async function withModel<T>(s: ModelSpec, job: () => Promise<T>): Promise
 
 export { specOf };
 
-/** Category top-3, seasons and the image embedding of a cut-out with one classification model. */
+/**
+ * Category top-3, seasons and the image embedding of a cut-out with one classification model. The prompt
+ * embeddings come first: they are cached, so the text model loads once per phone, in a worker of its own that
+ * is let go before the image model loads (bug-audit #8).
+ */
 export async function analyseWith(s: ModelSpec, cutout: Blob) {
   return withModel(s, async () => {
-    const embedding = await imageEmbedding(s, cutout);
     const cats = categoryPrompts();
     const flat = await textEmbeddings(s, [...cats, ...WARMTH_PROMPTS]);
+    const embedding = await imageEmbedding(s, cutout);
     const categories = topCategories(embedding, categoryVectors(flat.slice(0, cats.length)));
     const warmth = zeroShot(embedding, flat.slice(cats.length));
     const seasons = categories.length ? suggestSeasons(categories[0].id, warmth) : [];

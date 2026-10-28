@@ -46,6 +46,18 @@ export async function makeThumb(blob: Blob, size = 256): Promise<Blob | undefine
   }
 }
 
+/** A small JPEG of a photo for the queue strip and the inbox (bug-audit #11); undefined if it can't be decoded. */
+export async function makePreview(blob: Blob, size = 96): Promise<Blob | undefined> {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const c = drawScaled(bmp, bmp.width, bmp.height, size);
+    bmp.close();
+    return await canvasToBlob(c, 'image/jpeg', 0.8);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Grabs the current camera frame as a JPEG original. */
 export async function captureFrame(video: HTMLVideoElement, maxEdge = 2048): Promise<Blob> {
   const c = drawScaled(video, video.videoWidth, video.videoHeight, maxEdge);
