@@ -2,7 +2,7 @@
 // Model downloads are refused (no network for Hugging Face), so the queue never fetches real models.
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { failWrites, fakeDevice, garmentFile, openApp, setCamera, withDb } from './helpers';
+import { fakeDevice, garmentFile, openApp, setCamera, withDb } from './helpers';
 
 test.beforeEach(async ({ context }) => {
   await fakeDevice(context);
@@ -50,22 +50,32 @@ async function seedJob(page: Page, o: { id: string; state: 'waiting' | 'working'
     await db.queue.put({ kind: 'garment', ...(db.queuePhotos ? {} : { blob: png }), createdAt: ${o.createdAt ?? 'Date.now()'}, ...${JSON.stringify(o)} });`);
 }
 
-/** Makes the next `times` writes that store a new queue photo fail like iOS, whichever table and method the queue uses. */
-async function failQueueWrites(page: Page, times = Infinity) {
-  await page.evaluate((times) => {
-    const db = (window as any).__imq.db;
-    let left = times;
-    for (const name of ['queue', 'queuePhotos']) {
-      const t = db[name];
+/**
+ * Every write to these tables fails like iOS after the page was in the background ("Connection to Indexed
+ * Database server lost"), however many times the app retries, until healTables(). Covers whichever write method
+ * a data function uses, and its own reopen-and-retry.
+ */
+async function breakTables(page: Page, tables: string[]) {
+  await page.evaluate((tables) => {
+    const w = window as any;
+    w.__imqBroken ??= [];
+    for (const name of tables) {
+      const t = w.__imq.db[name];
       if (!t) continue;
-      for (const m of ['add', 'bulkAdd', 'put', 'bulkPut']) {
-        const real = t[m].bind(t);
-        t[m] = (...a: unknown[]) => (left-- > 0
-          ? Promise.reject(new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'))
-          : real(...a));
+      for (const m of ['add', 'bulkAdd', 'put', 'bulkPut', 'update', 'delete', 'bulkDelete']) {
+        t[m] = () => Promise.reject(new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'));
+        w.__imqBroken.push([t, m]);
       }
     }
-  }, times === Infinity ? 1e9 : times);
+  }, tables);
+}
+
+async function healTables(page: Page) {
+  await page.evaluate(() => {
+    const w = window as any;
+    for (const [t, m] of w.__imqBroken ?? []) delete t[m];
+    w.__imqBroken = [];
+  });
 }
 
 const toast = (page: Page) => page.locator('.toast');
@@ -95,10 +105,11 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
     const shutter = page.getByRole('button', { name: 'Take photo' });
     await expect(shutter).toBeVisible();
     await page.waitForFunction(() => (document.querySelector('video') as HTMLVideoElement | null)?.videoWidth);
-    await failQueueWrites(page, 2);
+    await breakTables(page, ['queue', 'queuePhotos']);
     await shutter.click();
     await expect(toast(page)).toContainText('Couldn’t keep the photo');
     await expect(page.locator('.wd-cam__flash')).toHaveCount(0);
+    await healTables(page);
     await toast(page).getByRole('button', { name: 'Try again' }).click();
     await expect.poll(() => withDb(page, 'return db.queue.count()')).toBe(1);
     await expect(page.locator('.wd-cam__flash')).toHaveCount(1);
@@ -106,7 +117,7 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
 
   test('#3 a gallery import that can’t be stored says so', async ({ page }) => {
     await openApp(page, { route: '/add' });
-    await failQueueWrites(page);
+    await breakTables(page, ['queue', 'queuePhotos']);
     await page.locator('label.wd-cam__side input[type=file]').setInputFiles([await garmentFile(page, 'tee'), await garmentFile(page, 'jeans')]);
     await expect(toast(page)).toContainText('Couldn’t keep the photo');
   });
@@ -116,10 +127,11 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
     await seedItem(page, { id: 'r1', name: 'Navy T-shirt' });
     await page.goto('./?e2e#/item/r1');
     const save = page.getByRole('button', { name: /^Save/ });
-    await failWrites(page, 'items', 'put', 2);
+    await breakTables(page, ['items']);
     await save.click();
     await expect(toast(page)).toContainText('Couldn’t save');
     await expect(save).toBeEnabled();
+    await healTables(page);
     await save.click();
     await expect.poll(() => withDb(page, `return (await db.items.get('r1')).status`)).toBe('active');
   });
@@ -129,10 +141,9 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
     await seedItem(page, { id: 'old', name: 'Olive skirt', category: 'skirt', status: 'active', colours: ['olive'], photos: 2 });
     await seedItem(page, { id: 'r1', name: 'Olive skirt', category: 'skirt', colours: ['olive'], suggestion: { categories: [{ id: 'skirt', score: 0.9 }], aiFields: ['name', 'category'], sameItemId: 'old' } });
     await page.goto('./?e2e#/item/r1');
-    await failWrites(page, 'photos', 'update');
+    await breakTables(page, ['photos', 'items']);
     await page.getByRole('button', { name: /Looks good/ }).click();
     await expect(toast(page)).toContainText('didn’t work');
-    await failWrites(page, 'items', 'delete');
     await page.getByRole('button', { name: 'Yes, same one' }).click();
     await expect(toast(page)).toContainText('didn’t work');
     await page.getByRole('button', { name: 'Delete this photo' }).click();
@@ -141,7 +152,6 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
 
     await page.goto('./?e2e#/item/old');
     await page.getByRole('button', { name: /Photo 2/ }).click();
-    await failWrites(page, 'items', 'put');
     await page.getByRole('button', { name: 'Use for try-on' }).click();
     await expect(toast(page)).toContainText('Couldn’t save');
   });
@@ -150,7 +160,7 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
     await openApp(page);
     await seedItem(page, { id: 'r1', name: 'Navy T-shirt' });
     await page.goto('./?e2e#/item/r1/fix');
-    await failWrites(page, 'photos', 'update');
+    await breakTables(page, ['photos']);
     await page.getByRole('button', { name: 'Use this cut-out' }).click();
     await expect(toast(page)).toContainText('Couldn’t save');
     await expect(page.getByRole('button', { name: 'Use this cut-out' })).toBeEnabled();
@@ -160,10 +170,9 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
     await openApp(page);
     await seedJob(page, { id: 'j1', state: 'failed', error: 'Something odd' });
     await page.goto('./?e2e#/review');
-    await failWrites(page, 'queue', 'update');
+    await breakTables(page, ['queue']);
     await page.getByRole('button', { name: 'Try again' }).click();
     await expect(toast(page)).toContainText('didn’t work');
-    await failWrites(page, 'queue', 'delete');
     await page.getByRole('button', { name: 'Remove' }).click();
     await expect(toast(page)).toContainText('didn’t work');
     await expect(page).toHaveURL(/#\/review/);
@@ -175,7 +184,7 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
     await page.getByRole('group', { name: 'Where it goes' }).getByRole('button').first().click();
     const move = page.locator('.wd-movebar button');
     await expect(move).toBeEnabled();
-    await failWrites(page, 'items', 'update');
+    await breakTables(page, ['items']);
     await move.click();
     await expect(toast(page)).toContainText('Couldn’t save');
     await expect(move).toBeEnabled();
@@ -183,7 +192,7 @@ test.describe('#3 silent failures in adding and reviewing clothes', () => {
     await page.goto('./?e2e#/places');
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await page.getByRole('button', { name: /^Edit / }).first().click();
-    await failWrites(page, 'locations', 'update');
+    await breakTables(page, ['locations']);
     await page.getByRole('dialog').getByRole('textbox').fill('Attic');
     await page.getByRole('dialog').getByRole('button', { name: 'Rename' }).click();
     await expect(toast(page)).toContainText('Couldn’t save');
