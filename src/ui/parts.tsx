@@ -1,6 +1,7 @@
 // Paper components shared by every screen. Styling lives in styles/global.css.
-import { useEffect, useState, type ReactNode } from 'react';
-import { goBack } from '../app/router';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
+import { goBack, sheetEntry } from '../app/router';
 import { useI18n } from '../i18n';
 import { Icon, type IconName } from './icons';
 
@@ -76,18 +77,107 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
+/** The control last pressed: WebKit doesn't focus a button that is tapped or clicked, so the focus can't tell. */
+let lastPressed: HTMLElement | null = null;
+if (typeof document !== 'undefined') {
+  document.addEventListener('pointerdown', (e) => { lastPressed = (e.target as Element).closest?.<HTMLElement>('button, a[href], input, [tabindex]') ?? null; }, true);
+}
+
 export function Sheet({ onClose, children, label }: { onClose: () => void; children: ReactNode; label: string }) {
+  const ref = useRef<HTMLElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  // Read before the children mount: an autofocused field takes the focus first.
+  const [opener] = useState(() => (document.activeElement && document.activeElement !== document.body ? document.activeElement as HTMLElement : lastPressed));
+  const kbd = useKeyboardLift(ref);
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') close.current(); };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
-  }, [onClose]);
+  }, []);
+  // Back and the iPhone edge swipe close the sheet, not the screen under it (bug-audit #24).
+  useEffect(() => sheetEntry(() => close.current()), []);
+  // VoiceOver (bug-audit #43): the focus moves into the sheet and the screen behind it is out of reach;
+  // on close the focus goes back where it was. The sheet slides out instead of vanishing (#48).
+  useLayoutEffect(() => {
+    const el = ref.current!;
+    const back = scrim.current!;
+    const hash = location.hash;
+    if (!el.contains(document.activeElement)) {
+      const title = el.querySelector<HTMLElement>('h1, h2') ?? el;
+      title.tabIndex = -1;
+      title.focus({ preventScroll: true });
+    }
+    const restore = inertOutside(el, back);
+    return () => {
+      restore();
+      if (location.hash !== hash) return; // left the screen: the next one takes the focus
+      slideOut(el, back);
+      if (opener?.isConnected && opener !== document.body) opener.focus({ preventScroll: true });
+    };
+  }, [opener]);
+  const style = kbd ? ({ bottom: kbd.lift, '--sheet-max': `${kbd.max}px` } as CSSProperties) : undefined;
   return (
     <>
-      <div className="scrim" onClick={onClose} />
-      <section className="sheet" role="dialog" aria-modal="true" aria-label={label}>{children}</section>
+      <div ref={scrim} className="scrim" onClick={onClose} />
+      <section ref={ref} className={`sheet${kbd ? ' sheet--kbd' : ''}`} style={style} role="dialog" aria-modal="true" aria-label={label}>{children}</section>
     </>
   );
+}
+
+/**
+ * While a field in the sheet has the focus and the iOS keyboard covers the bottom of the screen, the sheet sits on
+ * top of the keyboard and fits the visible area (bug-audit #32). iOS shrinks only the visual viewport.
+ */
+function useKeyboardLift(ref: RefObject<HTMLElement | null>): { lift: number; max: number } | null {
+  const [kbd, setKbd] = useState<{ lift: number; max: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const a = document.activeElement;
+      const typing = !!a && !!ref.current?.contains(a) && a.matches('input, textarea, select, [contenteditable]');
+      const lift = Math.max(0, Math.round(innerHeight - vv.height - vv.offsetTop));
+      setKbd(typing && lift > 0 ? { lift, max: Math.round(vv.height) - 24 } : null);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [ref]);
+  return kbd;
+}
+
+/** Makes everything outside `el` inert (out of reach of taps, Tab and VoiceOver); returns the undo. */
+function inertOutside(el: Element, keep: Element): () => void {
+  const done: Element[] = [];
+  for (let node: Element = el; node.parentElement && node !== document.body; node = node.parentElement) {
+    for (const sib of node.parentElement.children) {
+      if (sib === node || sib === keep || sib.hasAttribute('inert') || sib.matches('script, .toast, [aria-live]')) continue;
+      sib.setAttribute('inert', '');
+      done.push(sib);
+    }
+  }
+  return () => done.forEach((s) => s.removeAttribute('inert'));
+}
+
+/** Plays the sheet sliding down on a copy, since the real one is already being removed. */
+function slideOut(el: HTMLElement, back: HTMLElement) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const ghosts = [back, el].map((n) => {
+    const g = n.cloneNode(true) as HTMLElement;
+    for (const a of ['role', 'aria-modal', 'aria-label', 'id']) g.removeAttribute(a);
+    g.setAttribute('aria-hidden', 'true');
+    g.setAttribute('inert', '');
+    g.classList.add(n === el ? 'sheet--closing' : 'scrim--closing');
+    document.body.appendChild(g);
+    return g;
+  });
+  setTimeout(() => ghosts.forEach((g) => g.remove()), 200);
 }
 
 export function Tag({ children, ink }: { children: ReactNode; ink?: boolean }) {
@@ -158,8 +248,40 @@ export function CutoutImg({ blob, alt, size, style }: { blob?: Blob | null; alt:
   return <img className="cutout" src={url} alt={alt} width={size} height={size} style={{ width: size, height: size, ...style }} draggable={false} />;
 }
 
-/** Short-lived message at the bottom; pass an action for "Undo"-style follow-ups. */
-export function Toast({ children, action, onDone, ms = 3500 }: { children: ReactNode; action?: ReactNode; onDone: () => void; ms?: number }) {
-  useEffect(() => { const id = setTimeout(onDone, ms); return () => clearTimeout(id); }, [onDone, ms]);
-  return <div className="toast" role="status"><span className="grow">{children}</span>{action}</div>;
+/** The live region every toast is drawn into; set by ToastHost. */
+let toastHost: HTMLElement | null = null;
+
+/**
+ * One polite live region, always in the page, that every toast is drawn into (bug-audit #44): VoiceOver can miss a
+ * region that appears together with its text. Rendered once by the app shell.
+ */
+export function ToastHost() {
+  return <div className="toast-host" role="status" aria-live="polite" ref={(el) => { toastHost = el; }} />;
+}
+
+/**
+ * Short-lived message at the bottom; pass an action for "Undo"-style follow-ups. A toast with an action stays at
+ * least 6 s and waits while it is touched. It is drawn into the shell's live region, so VoiceOver reads it out.
+ * The toast sits outside the screen's own markup: place it with `className`, not with a screen-scoped selector.
+ */
+export function Toast({ children, action, onDone, ms = 3500, className }: { children: ReactNode; action?: ReactNode; onDone: () => void; ms?: number; className?: string }) {
+  const left = useRef(action ? Math.max(ms, 6000) : ms);
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (held) return;
+    const start = Date.now();
+    const id = setTimeout(onDone, Math.max(left.current, 1500));
+    return () => {
+      clearTimeout(id);
+      left.current -= Date.now() - start;
+    };
+  }, [held, onDone]);
+  const hold = () => setHeld(true);
+  const release = () => setHeld(false);
+  const box = (
+    <div className={`toast${className ? ` ${className}` : ''}`} onPointerDown={hold} onPointerUp={release} onPointerCancel={release} onFocus={hold} onBlur={release}>
+      <span className="grow">{children}</span>{action}
+    </div>
+  );
+  return toastHost?.isConnected ? createPortal(box, toastHost) : box;
 }

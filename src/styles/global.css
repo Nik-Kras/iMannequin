@@ -101,7 +101,7 @@ h1, h2, h3, p { margin: 0; }
 .num { font-variant-numeric: tabular-nums; }
 
 /* ---------- Header ---------- */
-.header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding-inline: var(--gutter) 16px; }
+.header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding-inline: var(--gutter) 16px; }
 .header__actions { display: flex; gap: 10px; align-items: center; }
 .back {
   display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 6px 0 0;
@@ -116,11 +116,12 @@ h1, h2, h3, p { margin: 0; }
   transition: transform 120ms ease-out, box-shadow 120ms ease-out, opacity 120ms;
 }
 .btn:active { transform: translateY(1px); }
-.btn:disabled, .btn[aria-disabled='true'] { opacity: 0.4; cursor: default; }
+/* Pencil with graphite text, readable at 4.6:1 (40 % opacity was 2.7:1, bug-audit #47). */
+.btn:disabled, .btn[aria-disabled='true'] { background: var(--pencil); border-color: var(--pencil); color: var(--graphite); box-shadow: none; cursor: default; transform: none; }
 .btn--primary { border: 0; background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-button); }
 .btn--secondary { border: 1.5px solid var(--ink); background: var(--sheet); color: var(--ink); }
 .btn--danger { border: 1.5px solid var(--marker); background: var(--sheet); color: var(--marker); }
-.btn--block { width: 100%; }
+.btn--block { width: 100%; white-space: normal; text-align: center; } /* a long label wraps instead of overflowing (#39) */
 .btn--sm { height: 44px; padding: 0 16px; font-size: 15px; }
 .btn--square { width: 52px; padding: 0; flex: none; }
 .text-action {
@@ -144,14 +145,15 @@ h1, h2, h3, p { margin: 0; }
 .chip::after { content: ''; position: absolute; inset: -4px -2px; } /* 44px touch area */
 .chip[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
 .chip--soft { border-color: transparent; background: var(--tissue); }
-.chip--dashed { border-style: dashed; border-color: var(--dash); background: transparent; }
+.chip--dashed { border-style: dashed; border-color: var(--line); background: transparent; }
 .chip__ai { width: 12px; height: 12px; flex: none; }
 .seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 20px; background: var(--tissue); }
 .seg--on-paper { background: var(--sheet); box-shadow: var(--shadow-rest); }
 .seg button {
-  height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: transparent;
+  position: relative; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: transparent;
   font: 500 14px var(--font-text); color: var(--ink);
 }
+.seg button::after { content: ''; position: absolute; inset: -5px 0; } /* 44px touch area (bug-audit #42) */
 .seg button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
 .switch {
   display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0;
@@ -178,7 +180,11 @@ h1, h2, h3, p { margin: 0; }
   font: 500 15px var(--font-text);
 }
 .list-row + .list-row { border-top: 1px solid var(--rule); }
-.dashed-slot { border: 1.5px dashed var(--dash); border-radius: var(--r-card); background: transparent; color: var(--graphite); }
+.dashed-slot { border: 1.5px dashed var(--line); border-radius: var(--r-card); background: transparent; color: var(--graphite); }
+/* Pressed: the paper gives a little under the finger (bug-audit #48). */
+.chip, .list-row, .trip-piece, .picker__cell { transition: transform 100ms ease-out, background-color 100ms; }
+.chip:active, .trip-piece:active, .picker__cell:active { transform: scale(0.96); }
+.list-row:active { background: var(--tissue); }
 
 /* Bottom sheet that slides up like a sheet of paper (design §2). */
 .sheet {
@@ -195,6 +201,16 @@ h1, h2, h3, p { margin: 0; }
 .scrim { position: fixed; inset: 0; z-index: 29; background: rgba(20, 20, 20, 0.28); animation: fade-in 200ms; }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fade-in { from { opacity: 0; } }
+/* Above the iOS keyboard while one of its fields is focused (bug-audit #32); the Sheet sets bottom and --sheet-max. */
+.sheet--kbd { padding-bottom: 8px; }
+.sheet.sheet--kbd > * { max-height: var(--sheet-max); overflow-y: auto; overscroll-behavior: contain; }
+/* A closed sheet slides away instead of vanishing (bug-audit #48): a copy plays this, then goes. */
+.sheet--closing { pointer-events: none; animation: sheet-down 180ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.scrim--closing { pointer-events: none; animation: fade-out 180ms forwards; }
+@keyframes sheet-down { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes fade-out { to { opacity: 0; } }
+/* Headings and sheets get the focus for VoiceOver after a navigation (bug-audit #43); no ring for that. */
+[tabindex='-1']:focus { outline: none; }
 
 /* ---------- Fields ---------- */
 .field { display: flex; flex-direction: column; gap: 6px; }
@@ -237,9 +253,11 @@ textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: ver
   clip-path: polygon(0 100%, 0 60%, 3% 20%, 7% 70%, 11% 30%, 15% 80%, 19% 25%, 23% 60%, 27% 15%, 31% 75%, 35% 35%, 39% 85%, 43% 20%, 47% 65%, 51% 30%, 55% 80%, 59% 15%, 63% 55%, 67% 25%, 71% 75%, 75% 35%, 79% 85%, 83% 20%, 87% 60%, 91% 30%, 95% 70%, 100% 25%, 100% 100%);
 }
 .tab {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px;
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1 1 0; min-width: 0;
   font: 500 12px var(--font-text); color: var(--graphite); text-decoration: none; border: 0; background: none; padding: 0;
+  text-align: center; overflow-wrap: anywhere;
 }
+@media (max-width: 300px) { .tab { font-size: 10.5px; } .tab__icon { width: 44px; } } /* page zoom (bug-audit #39) */
 .tab__icon { width: 52px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: var(--ink); }
 .tab[aria-current='page'] { color: var(--ink); font-weight: 600; }
 .tab[aria-current='page'] .tab__icon { background: var(--ink); color: var(--sheet); }
@@ -256,7 +274,7 @@ textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: ver
   background: var(--ink); color: var(--sheet); font: 500 15px var(--font-text); text-decoration: none; border: 0; width: 100%; text-align: left;
 }
 .empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px var(--gutter); text-align: center; color: var(--graphite); }
-.bar { height: 6px; border-radius: 3px; background: var(--tissue); overflow: hidden; }
+.bar { height: 6px; border-radius: 3px; background: var(--tissue); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
 .bar > span { display: block; height: 100%; background: var(--ink); border-radius: 3px; transition: width 300ms ease-out; }
 .spinner { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--pencil); border-top-color: var(--ink); animation: spin 0.8s linear infinite; }
 .spinner--on-ink { border-color: rgba(255, 255, 255, 0.35); border-top-color: #fff; }
@@ -269,6 +287,11 @@ textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: ver
 }
 .toast .text-action { color: var(--sheet); }
 
+/* Reduce Motion (bug-audit #41): every animation plays once, instantly; nothing loops or strobes. Progress still
+   shows: the spinner breathes slowly instead of turning, and the body scan line stays still. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+  .spinner { animation: spinner-breathe 1.6s ease-in-out infinite alternate !important; }
+  .bp__scan { animation: none !important; }
 }
+@keyframes spinner-breathe { from { opacity: 1; } to { opacity: 0.35; } }
