@@ -19,7 +19,7 @@ export default {
   'ai.dl.total': 'Total download',
   'ai.dl.wifi': 'Wi-Fi\nrecommended',
   'ai.dl.models': 'Models',
-  'ai.dl.searchLater': 'downloads later, when a search needs it',
+  'ai.dl.searchLater': 'optional: get it later in Settings → Model lab',
   'ai.dl.download': 'Download {size}',
   'ai.dl.needThem': 'You’ll need them before adding clothes.',
   'ai.dl.notNow': 'Not now',

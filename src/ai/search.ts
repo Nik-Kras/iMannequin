@@ -1,8 +1,9 @@
 // Search by description (F5, D32): keyword filters first, CLIP text→image ranking second, and the
-// small language model only when the words can't be mapped (Ukrainian or free-form text).
+// small language model only when the words can't be mapped (Ukrainian or free-form text), and only when the
+// user asks for it: it peaks at about 4 GB, so it never runs by itself or on WebAssembly (bug-audit #10).
 import { db, getSettings } from '../data/db';
 import type { Item, Photo } from '../domain/types';
-import { exclusive, failKey, guarded, run, deviceFor, isNetworkError, type Progress } from './client';
+import { exclusive, failKey, guarded, run, deviceFor, isNetworkError, releaseAi, type Progress } from './client';
 import { cosine } from './classify';
 import { isDownloaded } from './downloads';
 import { textEmbeddings, usableModel, withModel } from './embed';
@@ -13,8 +14,8 @@ import {
 import type { SearchHit } from './index';
 
 export interface SearchOptions {
-  /** 'auto' uses the language model when needed and already downloaded; 'download' may fetch it first; 'off' never. */
-  llm?: 'auto' | 'download' | 'off';
+  /** 'run' uses the language model when needed and downloaded; 'download' may fetch it first; 'off' (default) never. */
+  llm?: 'run' | 'download' | 'off';
   onProgress?: Progress;
   /** Called with the keyword results before the language model runs, so the screen can show them at once. */
   onPlain?: (hits: SearchHit[]) => void;
@@ -27,6 +28,8 @@ export interface SearchResult {
   usedLlm: boolean;
   /** The search model is on this phone. */
   llmDownloaded: boolean;
+  /** The search model can run here: there is one, and the phone has WebGPU. */
+  llmUsable: boolean;
 }
 
 const LLM_TIMEOUT = 90_000;
@@ -43,6 +46,8 @@ export async function searchDetailed(text: string, opts: SearchOptions = {}): Pr
   const needsLlm = needsLanguageModel(q);
   const llmSpec = await usableModel(settings, 'search');
   const llmDownloaded = llmSpec ? await isDownloaded(llmSpec.id) : false;
+  const llmDevice = llmSpec ? await deviceFor(llmSpec) : null;
+  const llmUsable = llmDevice === 'webgpu';
 
   const clip = await usableModel(settings, 'classify');
   const clipReady = clip ? await isDownloaded(clip.id) : false;
@@ -50,13 +55,19 @@ export async function searchDetailed(text: string, opts: SearchOptions = {}): Pr
   if (needsLlm && opts.onPlain) opts.onPlain(rank(items, q, null));
 
   let usedLlm = false;
-  if (needsLlm && llmSpec && opts.llm !== 'off' && (llmDownloaded || opts.llm === 'download')) {
+  const asked = opts.llm === 'run' || opts.llm === 'download';
+  if (needsLlm && llmSpec && llmUsable && asked && (llmDownloaded || opts.llm === 'download')) {
     try {
-      const device = await deviceFor(llmSpec);
-      const key = failKey(llmSpec.id, device);
-      const answer = await exclusive(() => withModel(llmSpec, () => guarded(key, () => run<string>(key,
-        { type: 'generate', spec: llmSpec, messages: llmMessages(text, places), maxTokens: 160 },
-        { onProgress: opts.onProgress, timeoutMs: llmDownloaded ? LLM_TIMEOUT : 60 * 60_000 }))));
+      const key = failKey(llmSpec.id, 'webgpu');
+      const answer = await exclusive(async () => {
+        try {
+          return await withModel(llmSpec, () => guarded(key, () => run<string>(key,
+            { type: 'generate', spec: llmSpec, messages: llmMessages(text, places), maxTokens: 160 },
+            { onProgress: opts.onProgress, timeoutMs: llmDownloaded ? LLM_TIMEOUT : 60 * 60_000 })));
+        } finally {
+          releaseAi(); // its memory goes back as soon as it has answered
+        }
+      });
       const parsed = parseLlmAnswer(answer);
       if (parsed) { q = mergeLlm(q, parsed, places); usedLlm = true; }
     } catch (err) {
@@ -79,7 +90,7 @@ export async function searchDetailed(text: string, opts: SearchOptions = {}): Pr
       }
     } catch { sims = null; }
   }
-  return { hits: rank(items, q, sims), query: q, needsLlm, usedLlm, llmDownloaded };
+  return { hits: rank(items, q, sims), query: q, needsLlm, usedLlm, llmDownloaded, llmUsable };
 }
 
 async function embeddedPhotos(items: Item[], model: string): Promise<Photo[]> {
