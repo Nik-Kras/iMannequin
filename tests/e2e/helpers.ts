@@ -167,6 +167,10 @@ export async function openApp(page: Page, { seed = false, onboarded = true, lang
   await page.evaluate(() => Promise.race([navigator.serviceWorker?.ready, new Promise((r) => setTimeout(r, 3000))]));
   await page.goto(`./?e2e#${route}`);
   await page.waitForFunction(() => (window as unknown as { __imq?: unknown }).__imq);
+  // The app has started on this page (settings read, diagnostics session open), so a test never races the start.
+  await page.waitForFunction(() => {
+    try { return JSON.parse(localStorage.getItem('imq-bb-session') ?? 'null')?.started >= Math.floor(performance.timeOrigin); } catch { return false; }
+  });
 }
 
 /** Runs code against the app's Dexie database; `db` is in scope. Needs openApp (?e2e). */
