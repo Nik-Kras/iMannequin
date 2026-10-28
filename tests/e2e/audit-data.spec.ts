@@ -127,3 +127,35 @@ test.describe('#2 garments from an earlier session keep their images', () => {
     expect(await deadBlobs(page)).toEqual([]);
   });
 });
+
+test.describe('#5 backup', () => {
+  test('#5 an image WebKit lost doesn\'t fail the backup; the file restores everything else', async ({ launch }, info) => {
+    test.setTimeout(90_000);
+    let { context, page } = await launch();
+    await openApp(page, { route: '/wardrobe' });
+    await withDb(page, `${SEED_IMAGES}
+      await db.items.bulkPut([item('a', 'active'), item('b', 'active')]);
+      await db.photos.bulkPut([await photo('p-a', 'a', '#1f3a5f'), await photo('p-b', 'b', '#a33a2a')]);`);
+    await context.close();
+
+    ({ context, page } = await launch());
+    await context.addInitScript(() => { delete (Navigator.prototype as { share?: unknown }).share; delete (Navigator.prototype as { canShare?: unknown }).canShare; });
+    await openApp(page, { route: '/settings' });
+    // Rewriting a record with its stored Blobs (what #2 fixed in the app) still kills them in this session.
+    await withDb(page, `const p = await db.photos.get('p-b'); await db.photos.put({ ...p, cutoutApproved: true });`);
+    expect((await deadBlobs(page)).length).toBe(3);
+
+    const download = page.waitForEvent('download', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Export backup' }).click();
+    const file = info.outputPath('backup.imannequin');
+    await (await download).saveAs(file);
+    await expect(page.getByText('Couldn’t make the backup.')).toHaveCount(0);
+
+    await page.locator('input[type=file][accept*=imannequin]').setInputFiles(file);
+    await page.getByRole('button', { name: 'Replace and restore' }).click();
+    await expect.poll(() => withDb(page, `return (await db.photos.get('p-a'))?.original?.size ?? 0`)).toBeGreaterThan(0);
+    expect(await withDb(page, `return Object.keys(await db.photos.get('p-b')).filter((k) => ['original', 'cutout', 'thumb'].includes(k))`)).toEqual([]);
+    expect(await withDb(page, `return await db.items.count()`)).toBe(2);
+    expect(await deadBlobs(page)).toEqual([]);
+  });
+});

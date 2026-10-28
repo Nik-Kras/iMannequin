@@ -72,4 +72,10 @@ export default {
   'ai.lab.exportNote': 'A small file with timings and scores. No photos.',
   'ai.lab.results': 'Results from this run',
   'ai.lab.resultAlt': 'Cut-out by {model}',
+
+  // Backup export (bug-audit #5): exportBackupFile().skipped
+  'ai.backup.skipped_one': '{n} photo couldn’t be read on this phone, so it isn’t in the backup.',
+  'ai.backup.skipped_few': '{n} photos couldn’t be read on this phone, so they aren’t in the backup.',
+  'ai.backup.skipped_many': '{n} photos couldn’t be read on this phone, so they aren’t in the backup.',
+  'ai.backup.skipped_other': '{n} photos couldn’t be read on this phone, so they aren’t in the backup.',
 } as const;

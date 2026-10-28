@@ -87,7 +87,8 @@ describe('backup', () => {
     expect(s.lang).toBe('uk');
     expect(s.mannequin).toBe('outline');
     expect(s.notWornMonths).toBe(9);
-    expect(s.weather).toEqual({ enabled: true, lat: 50.4, lon: 30.5 });
+    // The weather location belongs to this phone, not the one the backup came from (bug-audit #5).
+    expect(s.weather).toEqual({ enabled: false });
     // Device-specific settings stay with this phone; the backup time becomes the last backup.
     expect(s.modelsReady).toBe(true);
     expect(s.installGuideDismissed).toBe(true);

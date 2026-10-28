@@ -196,6 +196,88 @@ describe('#16 / #20 what a job leaves behind', () => {
   });
 });
 
+describe('#5 backup', () => {
+  const img = (...b: number[]) => new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, ...b])], { type: 'image/png' });
+  const bytes = async (b: Blob) => Array.from(new Uint8Array(await b.arrayBuffer()));
+  async function seed() {
+    await db.items.put({ id: 'it1', name: 'Navy jeans', category: 'jeans', colours: ['navy'], seasons: [], tryOnPhotoId: 'ph1', status: 'active', createdAt: 1, updatedAt: 1 });
+    await db.photos.put({ id: 'ph1', itemId: 'it1', original: img(1), cutout: img(2), thumb: img(3), width: 9, height: 9, cutoutApproved: true, createdAt: 1 });
+    await db.photos.put({ id: 'ph2', itemId: 'it1', original: img(4), cutout: img(5), width: 9, height: 9, cutoutApproved: true, createdAt: 2 });
+    await db.body.put({ id: 'current', photo: img(7), cutout: img(8), mask: img(9), canonical: { width: 1, height: 2 }, landmarks: [], createdAt: 1 });
+  }
+  /** WebKit's dead Blob: reading its bytes fails. Marked by its type. */
+  const dead = (b: Blob) => new Blob([b], { type: 'image/x-dead' });
+  function deadReads() {
+    const read = Blob.prototype.arrayBuffer;
+    vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(function (this: Blob) {
+      return this.type === 'image/x-dead' ? Promise.reject(new DOMException('The object can not be found here.', 'NotFoundError')) : read.call(this);
+    });
+  }
+
+  it('#5 restore keeps this phone\'s crash-report choice, weather location and models, and clears the anchors cache', async () => {
+    const { applyBackup, exportBackup, readBackup } = await import('../../src/data/backup');
+    const { updateSettings, getSettings } = await import('../../src/data/db');
+    await seed();
+    await updateSettings({ diagnostics: false, weather: { enabled: true, lat: 50.4, lon: 30.5 }, models: { cutout: 'birefnet-lite' }, lang: 'uk' });
+    const file = await exportBackup();
+    await Promise.all(db.tables.map((t) => t.clear()));
+    await updateSettings({ diagnostics: true, weather: { enabled: false }, models: { cutout: 'plain-bg' } });
+    await db.anchors.put({ photoId: 'ph1', anchors: { group: 'bottom', points: {}, width: 1, height: 1 } });
+    await applyBackup(await readBackup(file));
+    const s = await getSettings();
+    expect({ diagnostics: s.diagnostics, weather: s.weather, models: s.models, lang: s.lang })
+      .toEqual({ diagnostics: true, weather: { enabled: false }, models: { cutout: 'plain-bg' }, lang: 'uk' });
+    expect(await db.anchors.count()).toBe(0);
+  });
+
+  it('#5 an unreadable image is left out: the backup finishes, says how many, and restores', async () => {
+    const backup = await import('../../src/data/backup');
+    await seed();
+    await db.photos.update('ph2', { cutout: dead(img(5)) });
+    deadReads();
+    const file = await backup.exportBackup();
+    expect(file.size).toBeGreaterThan(0);
+    expect((await backup.exportBackupFile()).skipped).toBe(1);
+    vi.restoreAllMocks();
+    await Promise.all(db.tables.map((t) => t.clear()));
+    await backup.applyBackup(await backup.readBackup(file));
+    expect(await bytes((await db.photos.get('ph1'))!.cutout!)).toEqual([0x89, 0x50, 0x4e, 0x47, 2]);
+    const ph2 = (await db.photos.get('ph2'))!;
+    expect(ph2.cutout).toBeUndefined();
+    expect(await bytes(ph2.original)).toEqual([0x89, 0x50, 0x4e, 0x47, 4]);
+  });
+
+  it('#5 restore reads images as slices of the file, never the whole file at once', async () => {
+    const { exportBackup, readBackup, applyBackup } = await import('../../src/data/backup');
+    await seed();
+    const file = await exportBackup();
+    const whole = vi.spyOn(file, 'arrayBuffer');
+    const parsed = await readBackup(file);
+    expect(whole).not.toHaveBeenCalled();
+    await Promise.all(db.tables.map((t) => t.clear()));
+    await applyBackup(parsed);
+    expect(await bytes((await db.body.get('current'))!.mask)).toEqual([0x89, 0x50, 0x4e, 0x47, 9]);
+  });
+
+  it('#5 the format stays compatible both ways', async () => {
+    const { unzipSync, zipSync, strToU8, strFromU8 } = await import('fflate');
+    const { exportBackup, readBackup, applyBackup, BACKUP_VERSION } = await import('../../src/data/backup');
+    await seed();
+    // A new backup opens with the previous version's reader: unzip it all, and every image it names is there.
+    const files = unzipSync(new Uint8Array(await (await exportBackup()).arrayBuffer()));
+    const manifest = JSON.parse(strFromU8(files['manifest.json']));
+    expect(manifest.version).toBe(BACKUP_VERSION);
+    const refs = JSON.stringify(manifest.tables).match(/"\$blob":"[^"]+"/g)!.map((r) => r.slice(9, -1));
+    expect(refs.length).toBe(8);
+    for (const r of refs) expect(files[r], r).toBeDefined();
+    // A backup laid out like the previous version's (manifest first) restores.
+    await Promise.all(db.tables.map((t) => t.clear()));
+    const old = zipSync({ 'manifest.json': strToU8(JSON.stringify(manifest)), ...Object.fromEntries(refs.map((r) => [r, [files[r], { level: 0 }]])) } as never);
+    await applyBackup(await readBackup(new Blob([old as BlobPart])));
+    expect(await bytes((await db.photos.get('ph1'))!.thumb!)).toEqual([0x89, 0x50, 0x4e, 0x47, 3]);
+  });
+});
+
 describe('#7 the default cut-out model', () => {
   it('#7 ORMBG is the default and the onboarding download; BiRefNet-lite stays selectable', async () => {
     const { defaultModel, chosenModel, specsFor, ONBOARDING_MODELS } = await import('../../src/ai/registry');

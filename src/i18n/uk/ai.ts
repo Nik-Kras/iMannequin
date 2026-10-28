@@ -73,4 +73,9 @@ export default {
   'ai.lab.exportNote': 'Невеликий файл із часом і оцінками. Без фото.',
   'ai.lab.results': 'Результати цієї перевірки',
   'ai.lab.resultAlt': 'Вирізала модель {model}',
+
+  'ai.backup.skipped_one': '{n} фото не вдалося прочитати на цьому телефоні, тож його немає в копії.',
+  'ai.backup.skipped_few': '{n} фото не вдалося прочитати на цьому телефоні, тож їх немає в копії.',
+  'ai.backup.skipped_many': '{n} фото не вдалося прочитати на цьому телефоні, тож їх немає в копії.',
+  'ai.backup.skipped_other': '{n} фото не вдалося прочитати на цьому телефоні, тож їх немає в копії.',
 } satisfies Record<keyof typeof en, string>;
