@@ -44,8 +44,14 @@ Rule: the owner approves every naming, design, feature and stack decision. Claud
 | D23 | 2026-10-27 | Item fields: photo, category, colours, location, seasons, notes, plus **brand**. **No** size, price or purchase date | Size; price; purchase date | Owner's choice |
 | D24 | 2026-10-27 | **No underwear or socks** categories | Include them | Owner: "too much" |
 | D25 | 2026-10-27 | The weather hint is **off by default**. Switching it on is the one accepted exception to R1: the app sends a location to the weather service | Always on; drop the feature | Owner's choice |
-| D26 | 2026-10-27 | Logo: **an outline of a person as a mannequin, with two pieces of clothing on it** | n/a | Owner's idea |
+| D26 | 2026-10-27 | ~~Logo: an outline of a person as a mannequin, with two pieces of clothing on it~~ **Superseded by D30** | n/a | Owner's idea |
 | D27 | 2026-10-27 | Visual style: **black and white, 2D paper cut-outs on crumpled paper**, with paper cut-out animations | n/a | Owner's idea. The clothes are the only colour on screen |
+| D28 | 2026-10-28 | Fonts: **Prata** for titles, **Onest** for text, **Caveat** for handwritten tags (place names, notes, stamps). All free Google Fonts with Cyrillic. Resolves Q5 | Unbounded + Onest; Tenor Sans + Onest (kept as the alternative) | Owner's choice |
+| D29 | 2026-10-28 | Navigation: four tabs, **Dress-up · Wardrobe · Outfits · Trips**, with a raised **centre +** for adding clothes. Settings opens from the Dress-up header. Resolves Q3 | Four tabs with + and Settings in the Dress-up header | Owner's choice |
+| D30 | 2026-10-28 | Logo: the **"iM" monogram**, white Prata letters on a black rounded tile, with the **iMannequin** wordmark in Prata. Supersedes D26 | Three mannequin marks: a paper doll with fold-over tabs; a figure where only the clothes are in colour; a figure cut out of black paper | Owner: "stylish, professional" |
+| D31 | 2026-10-28 | Dress-up layout: the mannequin on the left and **an always-visible column of slots** on the right (Hat, Scarf, Top with Base · Middle · Outer, Gloves, Bottoms, Shoes), each aligned with its body part and joined to it by a callout line. Extras is a side button (D17). Tapping a slot or the body opens the row of clothes **below the mannequin, never over it**. Refines D21 | A clothes rail with garments on hangers; a large mannequin you tap directly | Owner: clearer for choosing each piece, and every section is on the page without scrolling |
+| D32 | 2026-10-28 | Search by description: the language model candidates are **Qwen3-1.7B** (Apache-2.0, multilingual incl. Ukrainian; the default if the phone can hold it), **Qwen2.5-1.5B-Instruct** (Apache-2.0) and **Qwen3-0.6B** (Apache-2.0, the light fallback). The model **loads only when a search needs it**, one AI model in memory at a time, and plain keyword filters (seasons, colours, places, categories in both languages) run first. Calibration on the phone picks the default (D12). Resolves Q18 | Qwen2.5-0.5B (weak at Ukrainian); Qwen2.5-3B (not Apache); no language model | Owner agreed. Risk: iPhone Safari kills a tab at about 2 GB, and RHP's 2B model crashed there, so the 1.7B model must prove itself on the real phone |
+| D33 | 2026-10-28 | Ukrainian tab names: **Примірка · Гардероб · Образи · Поїздки** | n/a | Owner agreed |
 
 ## Open questions
 
@@ -55,9 +61,7 @@ Rule: the owner approves every naming, design, feature and stack decision. Claud
 |---|---|---|---|
 | Q1 | Med | Swimwear and nightwear? | ⭐ **Swimwear in** (useful for packing lists), nightwear out · both out · both in |
 | Q2 | Med | Where does the weather hint get the location from? | ⭐ **Phone location rounded to ~10 km**, asked once · a city typed once (only the name is sent) |
-| Q3 | High | *design*: tabs and navigation | ⭐ Dress-up · Wardrobe · Outfits · Trips, with **+** and Settings in the header · other layouts compared on the canvas |
 | Q4 | Med | *design*: dark mode? | ⭐ **Light only** (white paper) · an inverted "black paper" mode · follow the phone |
-| Q5 | Med | *design*: fonts (free only, R3) | Two or three pairs compared on the canvas |
 | Q6 | High | Privacy of shared outfit images when the mannequin is a real photo | ⭐ **Share uses the outline by default**, with a switch to include the photo · same as the screen · garments only (flat lay) |
 | Q7 | Med | Does an item have a name? | ⭐ **Auto-filled name** ("Navy jeans") the user can edit · no name, show category and colour |
 | Q8 | Med | How are shoes photographed? | ⭐ **The pair from the front** at floor level, to match the front-facing mannequin · from the side |

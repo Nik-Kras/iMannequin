@@ -48,7 +48,7 @@ Every model is chosen by calibration (D12). The candidates below are what the Mo
 | Category, seasons | F3 | Zero-shot image–text models: FashionCLIP (MIT), Marqo-FashionSigLIP (Apache-2.0), CLIP ViT-B/32 (MIT), SigLIP (Apache-2.0) | The user picks |
 | Colours | F3 | **Plain code:** cluster the cut-out's pixels (k-means) and map them to a named palette | n/a |
 | Same-item detection | F11 | Image embeddings from the classifier model. Cosine similarity within the same zone, then a stricter second check (colour histogram + a high threshold set during calibration) | The user decides |
-| Search by description | F5 | The query text and the item photos are compared with the same image–text model. A **small on-device language model** turns a free-form query into filters ("warm", "winter", "in the sofa"): Qwen2.5-0.5B-Instruct (Apache-2.0), SmolLM2-360M-Instruct (Apache-2.0). Optional item descriptions from a small vision-language model: Florence-2 base (MIT), SmolVLM-256M (Apache-2.0) | Plain filters |
+| Search by description | F5 | The query text and the item photos are compared with the same image–text model. A **small on-device language model** turns a free-form query into filters ("warm", "winter", "in the sofa"): Qwen3-1.7B (Apache-2.0, default candidate), Qwen2.5-1.5B-Instruct (Apache-2.0), Qwen3-0.6B (Apache-2.0, light fallback); loaded only when a query needs it, after plain keyword filters (D32). Optional item descriptions from a small vision-language model: Florence-2 base (MIT), SmolVLM-256M (Apache-2.0) | Plain filters |
 
 **Excluded:** BRIA RMBG models (non-commercial licence), and Llama and Gemma models (their licences aren't MIT/Apache/BSD).
 

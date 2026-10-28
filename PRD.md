@@ -78,8 +78,8 @@ It's free, installs from a QR code on Android and iPhone, and runs entirely on t
 - **Not worn in 6 months** (Q11) is a filter preset, to help decluttering.
 
 ### F6. Dress-up
-- The mannequin fills the screen. Tappable zones: **head, neck, torso, hands, legs, feet**. **Accessories** (bags, belts, glasses, jewellery) are side buttons (D17).
-- Tapping a zone **slides up a row of matching items**. Swiping through it puts each item on the mannequin live, and **See all** opens the full grid (D21). The torso row has **Base · Middle · Outer** layer tabs.
+- The mannequin stands on the left. On the right, **a column of slots** (Hat, Scarf, Top with its three layers, Gloves, Bottoms, Shoes) shows what's on, each aligned with its body part and joined to it by a callout line (D31). The body zones are tappable too: **head, neck, torso, hands, legs, feet**. **Accessories** (bags, belts, glasses, jewellery) are a side button (D17).
+- Tapping a slot or a zone **slides up a row of matching items below the mannequin, never over it**. Swiping through it puts each item on the mannequin live, and **See all** opens the full grid (D21). The torso row has **Base · Middle · Outer** layer tabs.
 - **Choosing a full-body item** (dress, jumpsuit) **clears** the base top and the legs, and the other way round.
 - **Tuck in** and **Trousers into boots** toggles (Q9).
 - Actions: **Save outfit**, **Wearing today** (F9), **Share** (F12), **Adjust fit** for the selected item (F7).

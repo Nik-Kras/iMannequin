@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-28T12:00:00Z",
+  "title": "Design System: iMannequin",
+  "source": "docs/design.md",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "primary", "displayName": "Ink", "canonical": "#141414", "tonalRamp": ["#0D0D0D", "#141414", "#2A2926", "#3D3B37", "#55524C", "#8F8A80", "#CFCAC1", "#EEECE7"] },
+      "graphite": { "role": "neutral", "displayName": "Graphite", "canonical": "#55524C", "tonalRamp": ["#1F1E1C", "#2E2C29", "#403E3A", "#55524C", "#6E6A63", "#8F8A80", "#B9B4AA", "#E4E0D8"] },
+      "carbon": { "role": "neutral", "displayName": "Carbon black paper", "canonical": "#0D0D0D", "tonalRamp": ["#000000", "#0D0D0D", "#1A1A1A", "#2A2926", "#3D3B37", "#55524C", "#8F8A80", "#B9B4AA"] },
+      "on-carbon-2": { "role": "neutral", "displayName": "On-carbon grey", "canonical": "#B9B4AA", "tonalRamp": ["#4A4741", "#605C55", "#78746B", "#8F8A80", "#A49F95", "#B9B4AA", "#D3CFC6", "#EDEBE6"] },
+      "paper": { "role": "neutral", "displayName": "Crumpled paper", "canonical": "#EEECE7", "tonalRamp": ["#4F4D48", "#6E6B65", "#8F8A80", "#BDB8AF", "#D8D3C9", "#E4E0D8", "#EEECE7", "#F6F5F2"] },
+      "sheet": { "role": "neutral", "displayName": "Sheet", "canonical": "#FFFFFF", "tonalRamp": ["#55524C", "#8F8A80", "#BDB8AF", "#D8D3C9", "#E4E0D8", "#EEECE7", "#F6F4EF", "#FFFFFF"] },
+      "tissue": { "role": "neutral", "displayName": "Tissue", "canonical": "#F6F4EF", "tonalRamp": ["#55524C", "#8F8A80", "#BDB8AF", "#D8D3C9", "#E4E0D8", "#EEECE7", "#F6F4EF", "#FFFFFF"] },
+      "pencil": { "role": "neutral", "displayName": "Pencil", "canonical": "#CFCAC1", "tonalRamp": ["#55524C", "#6E6A63", "#8F8A80", "#A9A49A", "#BDB8AF", "#CFCAC1", "#E4E0D8", "#F6F4EF"] },
+      "rule": { "role": "neutral", "displayName": "Rule", "canonical": "#E4E0D8", "tonalRamp": ["#55524C", "#8F8A80", "#BDB8AF", "#CFCAC1", "#D8D3C9", "#E4E0D8", "#EEECE7", "#F6F4EF"] },
+      "dash": { "role": "neutral", "displayName": "Dash", "canonical": "#9E998F", "tonalRamp": ["#3D3B37", "#55524C", "#6E6A63", "#8F8A80", "#9E998F", "#BDB8AF", "#CFCAC1", "#E4E0D8"] },
+      "marker": { "role": "error", "displayName": "Marker red", "canonical": "#B3261E", "tonalRamp": ["#410E0B", "#601410", "#8C1D18", "#B3261E", "#DC362E", "#E46962", "#F2B8B5", "#F9DEDC"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Screen title", "purpose": "One Prata title per screen, top left." },
+      "title": { "displayName": "Section title", "purpose": "Prata section titles in sheets and lists." },
+      "title-card": { "displayName": "Card title", "purpose": "Heading of a settings or form card." },
+      "body": { "displayName": "Body", "purpose": "Paragraphs, explanations and input text (16px so iOS does not zoom)." },
+      "body-row": { "displayName": "Row", "purpose": "List rows and item names." },
+      "meta": { "displayName": "Meta", "purpose": "Counts, dates and places in graphite. Never below 12px." },
+      "label": { "displayName": "Button", "purpose": "Button labels." },
+      "label-small": { "displayName": "Text action", "purpose": "Text-only actions such as See all and Adjust fit." },
+      "tag": { "displayName": "Luggage tag", "purpose": "Caveat for storage places, outfit names and notes." },
+      "stamp": { "displayName": "Rubber stamp", "purpose": "Caveat for finished states: packed, worn, done." }
+    },
+    "shadows": [
+      { "name": "paper-rest", "value": "0 0 0 .5px rgba(20,20,20,.07), 1px 2px 3px rgba(20,20,20,.14)", "purpose": "Every card, slot, round icon button and the search bar." },
+      { "name": "paper-lifted", "value": "0 0 0 .5px rgba(20,20,20,.08), 2px 6px 12px rgba(20,20,20,.18)", "purpose": "Selected or on-top pieces; garment cards also rise 3px." },
+      { "name": "ink-button", "value": "1px 2px 4px rgba(20,20,20,.25)", "purpose": "Primary button." },
+      { "name": "bottom-sheet", "value": "0 -4px 16px rgba(20,20,20,.08)", "purpose": "Sheets that slide up, paired with the curled top edge." },
+      { "name": "tab-bar", "value": "0 -2px 10px rgba(20,20,20,.05)", "purpose": "Bottom tab bar." },
+      { "name": "tab-add", "value": "0 0 0 5px #FFFFFF, 1px 5px 12px rgba(20,20,20,.3)", "purpose": "Centre + cut out of the tab bar by a white ring." },
+      { "name": "logo-tile", "value": "0 0 0 .5px rgba(20,20,20,.12), 0 2px 6px rgba(20,20,20,.22)", "purpose": "The iM logo tile." }
+    ],
+    "motion": [
+      { "name": "reduce-motion", "value": "prefers-reduced-motion: reduce", "purpose": "Every paper animation (garment flutter, sheet curl, tab slip, scissor trace, tag pin) is replaced by a plain fade or no motion. Durations are not decided yet." }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "390px" }
+    ],
+    "textures": [
+      { "name": "crumple", "value": "<filter><feTurbulence type=\"fractalNoise\" baseFrequency=\"0.012 0.017\" numOctaves=\"4\"/><feDiffuseLighting lighting-color=\"#ffffff\" surfaceScale=\"2.4\" diffuseConstant=\"1.08\"><feDistantLight azimuth=\"225\" elevation=\"40\"/></feDiffuseLighting></filter>", "purpose": "Crumpled paper ground, mix-blend-mode multiply at about 0.55 opacity. The only gradient-like effect." }
+    ],
+    "shapes": [
+      { "name": "luggage-tag", "value": "border-radius: 3px 15px 15px 3px; border: 1.5px solid #141414", "purpose": "Square eyelet end, round far end, with a small eyelet circle." },
+      { "name": "curled-edge", "value": "M0 12 C60 2 120 9 200 4 C270 0 330 6 390 1 L390 12 Z", "purpose": "Top edge of a sliding sheet, 12px tall, drawn in the sheet colour." }
+    ],
+    "focus": { "value": "outline: 2px solid #141414; outline-offset: 2px", "purpose": "Visible focus on every interactive element." },
+    "accessibility": {
+      "minTarget": "44px",
+      "minTargetGap": "8px",
+      "minTextSize": "12px",
+      "textContrast": "4.5:1",
+      "nonTextContrast": "3:1"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ink button for the main action on a screen or sheet.",
+      "html": "<button class=\"ds-btn-primary\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 4h12v17l-6-4-6 4Z\"/></svg>Save outfit</button>",
+      "css": ".ds-btn-primary { height: 52px; padding: 0 22px; border: none; border-radius: 14px; background: #141414; color: #FFFFFF; font: 600 16px 'Onest', system-ui, sans-serif; display: inline-flex; align-items: center; gap: 8px; box-shadow: 1px 2px 4px rgba(20,20,20,.25); cursor: pointer; transition: transform .15s, box-shadow .15s; } .ds-btn-primary:hover { transform: translateY(-1px); box-shadow: 2px 4px 8px rgba(20,20,20,.25); } .ds-btn-primary:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(20,20,20,.25); } .ds-btn-primary:focus-visible { outline: 2px solid #141414; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "White button with an ink border for the second action.",
+      "html": "<button class=\"ds-btn-secondary\">Wearing today</button>",
+      "css": ".ds-btn-secondary { height: 52px; padding: 0 22px; border: 1.5px solid #141414; border-radius: 14px; background: #FFFFFF; color: #141414; font: 600 16px 'Onest', system-ui, sans-serif; cursor: pointer; transition: background .15s; } .ds-btn-secondary:hover { background: #F6F4EF; } .ds-btn-secondary:focus-visible { outline: 2px solid #141414; outline-offset: 2px; }"
+    },
+    {
+      "name": "Chips",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Tissue choice chips; selected turns ink. The star marks an AI-suggested value.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\">Spring</button><button class=\"ds-chip\" aria-pressed=\"true\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8Z\"/></svg>Autumn</button></div>",
+      "css": ".ds-chips { display: flex; gap: 8px; } .ds-chip { height: 44px; padding: 0 16px; border: none; border-radius: 999px; background: #F6F4EF; color: #141414; font: 500 14.5px 'Onest', system-ui, sans-serif; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; } .ds-chip:hover { background: #EEECE7; } .ds-chip[aria-pressed=\"true\"] { background: #141414; color: #FFFFFF; } .ds-chip:focus-visible { outline: 2px solid #141414; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Tissue-filled field with the label above.",
+      "html": "<label class=\"ds-field\">Brand<input placeholder=\"e.g. Uniqlo\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; max-width: 360px; font: 500 14px 'Onest', system-ui, sans-serif; color: #141414; } .ds-field input { height: 48px; border: none; border-radius: 10px; background: #F6F4EF; padding: 0 14px; font: 400 16px 'Onest', system-ui, sans-serif; color: #141414; } .ds-field input::placeholder { color: #55524C; } .ds-field input:focus-visible { outline: 2px solid #141414; outline-offset: 2px; }"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Four tabs with a raised centre + for adding clothes (D29).",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Main\"><a href=\"#\" aria-current=\"page\"><span class=\"ds-tab-ic\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 3.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM8.5 9.5h7l1 5h-9ZM10 14.5 9.5 21M14 14.5l.5 6.5M8.5 9.5 5.5 15M15.5 9.5l3 5.5\"/></svg></span>Dress-up</a><a href=\"#\"><span class=\"ds-tab-ic\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10 5a2 2 0 1 1 2 2v2l8.6 6.3c.9.7.4 2.2-.7 2.2H4.1c-1.1 0-1.6-1.5-.7-2.2L12 9\"/></svg></span>Wardrobe</a><a href=\"#\" class=\"ds-tab-add\" aria-label=\"Add clothes\"><svg viewBox=\"0 0 24 24\" width=\"26\" height=\"26\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.1\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg></a><a href=\"#\"><span class=\"ds-tab-ic\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 4h12v17l-6-4-6 4Z\"/></svg></span>Outfits</a><a href=\"#\"><span class=\"ds-tab-ic\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 8h16v11H4ZM9 8V5h6v3M8 8v11M16 8v11\"/></svg></span>Trips</a></nav>",
+      "css": ".ds-tabs { width: 390px; height: 84px; background: #FFFFFF; box-shadow: 0 -2px 10px rgba(20,20,20,.05); display: flex; justify-content: space-around; padding-top: 8px; box-sizing: border-box; } .ds-tabs a { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 500 12px 'Onest', system-ui, sans-serif; color: #55524C; text-decoration: none; } .ds-tabs a:hover { color: #141414; } .ds-tabs a:focus-visible { outline: 2px solid #141414; outline-offset: 2px; } .ds-tab-ic { width: 52px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: #141414; } .ds-tabs a[aria-current=\"page\"] { color: #141414; font-weight: 600; } .ds-tabs a[aria-current=\"page\"] .ds-tab-ic { background: #141414; color: #FFFFFF; } .ds-tabs .ds-tab-add { flex: none; width: 56px; height: 56px; margin-top: -13px; border-radius: 50%; background: #141414; color: #FFFFFF; justify-content: center; box-shadow: 0 0 0 5px #FFFFFF, 1px 5px 12px rgba(20,20,20,.3); }"
+    },
+    {
+      "name": "Cut-out Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White paper card on the crumpled ground; lifts when selected.",
+      "html": "<div class=\"ds-ground\"><button class=\"ds-card\">Paper at rest</button><button class=\"ds-card\" aria-pressed=\"true\">Lifted, selected</button></div>",
+      "css": ".ds-ground { display: flex; gap: 12px; padding: 20px; background: #EEECE7; } .ds-card { width: 150px; height: 76px; border: none; border-radius: 6px; background: #FFFFFF; color: #55524C; font: 400 14px 'Onest', system-ui, sans-serif; box-shadow: 0 0 0 .5px rgba(20,20,20,.07), 1px 2px 3px rgba(20,20,20,.14); cursor: pointer; transition: transform .2s, box-shadow .2s; } .ds-card[aria-pressed=\"true\"] { transform: translateY(-3px) rotate(-0.6deg); box-shadow: 0 0 0 .5px rgba(20,20,20,.08), 2px 6px 12px rgba(20,20,20,.18); color: #141414; } .ds-card:focus-visible { outline: 2px solid #141414; outline-offset: 2px; }"
+    },
+    {
+      "name": "Slot with Callout",
+      "kind": "custom",
+      "refersTo": "slot-card",
+      "description": "Dress-up slot card joined to its body part by a dashed callout leader (D31).",
+      "html": "<div class=\"ds-slot-wrap\"><svg viewBox=\"0 0 250 62\" width=\"250\" height=\"62\" aria-hidden=\"true\"><path d=\"M110 31H40L18 16\" fill=\"none\" stroke=\"#55524C\" stroke-width=\"1.3\" stroke-dasharray=\"3 3\"/><circle cx=\"18\" cy=\"16\" r=\"2.8\" fill=\"#FFFFFF\" stroke=\"#55524C\" stroke-width=\"1.3\"/></svg><button class=\"ds-slot\"><span class=\"ds-slot-well\"></span><span class=\"ds-slot-text\"><span>Bottoms</span><strong>Blue jeans</strong></span></button></div>",
+      "css": ".ds-slot-wrap { position: relative; width: 250px; height: 62px; } .ds-slot-wrap svg { position: absolute; inset: 0; } .ds-slot { position: absolute; left: 110px; top: 8px; width: 140px; height: 46px; border: none; border-radius: 6px; background: #FFFFFF; box-shadow: 0 0 0 .5px rgba(20,20,20,.07), 1px 2px 3px rgba(20,20,20,.14); padding: 0 8px; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer; } .ds-slot:hover { box-shadow: 0 0 0 .5px rgba(20,20,20,.08), 2px 6px 12px rgba(20,20,20,.18); } .ds-slot:focus-visible { outline: 2px solid #141414; outline-offset: 2px; } .ds-slot-well { width: 34px; height: 30px; border-radius: 4px; background: #F6F4EF; flex: none; } .ds-slot-text { display: flex; flex-direction: column; font-family: 'Onest', system-ui, sans-serif; color: #141414; } .ds-slot-text span { font-size: 12px; color: #55524C; } .ds-slot-text strong { font-size: 13px; font-weight: 600; }"
+    },
+    {
+      "name": "Luggage Tag and Stamp",
+      "kind": "custom",
+      "refersTo": "luggage-tag",
+      "description": "Caveat paper devices: a tag for places and outfit names, a stamp for finished states.",
+      "html": "<div class=\"ds-devices\"><span class=\"ds-tag\"><span class=\"ds-eyelet\"></span>under the bed</span><span class=\"ds-stamp\">packed</span></div>",
+      "css": ".ds-devices { display: flex; gap: 24px; align-items: center; padding: 16px; } .ds-tag { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 9px; border: 1.5px solid #141414; border-radius: 3px 15px 15px 3px; background: #FFFFFF; color: #141414; font: 600 20px 'Caveat', cursive; transform: rotate(-2deg); } .ds-eyelet { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid #141414; } .ds-stamp { display: inline-flex; align-items: center; height: 40px; padding: 0 14px; border: 2px solid #141414; border-radius: 6px; color: #141414; font: 700 22px 'Caveat', cursive; opacity: .85; transform: rotate(-8deg); }"
+    },
+    {
+      "name": "Switch",
+      "kind": "custom",
+      "refersTo": "switch-on",
+      "description": "Settings switch, 52 x 32, ink when on.",
+      "html": "<button class=\"ds-switch\" role=\"switch\" aria-checked=\"true\" aria-label=\"Weather hint\"><span></span></button>",
+      "css": ".ds-switch { position: relative; width: 52px; height: 32px; border: none; border-radius: 16px; background: #8F8A80; padding: 0; cursor: pointer; transition: background .2s; } .ds-switch span { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(20,20,20,.25); transition: left .2s; } .ds-switch[aria-checked=\"true\"] { background: #141414; } .ds-switch[aria-checked=\"true\"] span { left: 24px; } .ds-switch:focus-visible { outline: 2px solid #141414; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Paper Doll Wardrobe",
+    "overview": "The mannequin is you. Everything else is paper and ink: a crumpled paper page, white cut-out cards, black ink for text and actions. The clothes are the only colour on screen (D27). Garments are cut-outs with a white scissor margin, so they read as pieces you can pick up and put on.\n\nThe world is calm and tactile, not cute. Titles are set in Prata, a high-contrast serif (D28). Text is Onest. Handwriting, in Caveat, appears only where a person would write by hand: tags on storage places and outfits, stamps, notes. Screens are dense but quiet, built for one thumb while standing (PRODUCT.md, principle 4).",
+    "keyCharacteristics": [
+      "Crumpled paper ground with white cut-out cards that cast soft offset shadows.",
+      "Ink and graphite only; the clothes carry all the colour.",
+      "Prata titles, Onest text, Caveat for hand-written tags and stamps.",
+      "Paper devices with meaning: luggage tags, rubber stamps, the pen circle, dashed callout lines.",
+      "Dress-up shows every slot at once, each joined to its body part (D31)."
+    ],
+    "rules": [
+      { "name": "The Clothes Are the Colour Rule", "body": "No hue appears in the UI except a garment's own colour and the marker red for errors. Swatches inside colour chips are garment colours, so they count as clothes.", "section": "colors" },
+      { "name": "The Marker Rule", "body": "Marker red is never decoration. If nothing is wrong or being deleted, there is no red on screen.", "section": "colors" },
+      { "name": "The 12px Floor Rule", "body": "No text is smaller than 12px. The only exception is the favicon-size logo tile, which is an image.", "section": "typography" },
+      { "name": "The Pen Only Writes Rule", "body": "Caveat is for words a person would write by hand: places, outfit names, stamps, notes. Never for buttons, titles, body text or numbers you need to read precisely.", "section": "typography" },
+      { "name": "The Never Over the Body Rule", "body": "Nothing covers the mannequin on Dress-up. Sheets stop at its feet.", "section": "layout" },
+      { "name": "The Soft Paper Rule", "body": "Paper shadows are offset and blurred. No hard, zero-blur block shadows.", "section": "elevation" },
+      { "name": "The Lift Means Chosen Rule", "body": "The lifted shadow means \"selected\" or \"on top\". Never use it for decoration.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the UI in ink, graphite and paper; let the garments be the colour.",
+      "Do use the paper-at-rest shadow on every card and the lifted shadow only for selected pieces.",
+      "Do show every Dress-up slot at once, each joined to its body part by a callout line (D31).",
+      "Do open the clothes row below the mannequin.",
+      "Do give every garment a white scissor margin and a drop shadow.",
+      "Do mark pre-filled values with the AI star and keep them editable (R5).",
+      "Do use only drawn garments and an outline or stand-in mannequin in the repo and its screenshots (R2)."
+    ],
+    "donts": [
+      "Don't use hard, zero-blur offset shadows.",
+      "Don't put an eyebrow or small label above a heading, or use tracked uppercase labels.",
+      "Don't write progress as text (\"Step 2 of 3\"); show it with bars or dots.",
+      "Don't use gradients other than the crumple texture, glass effects, or icons in tinted squares.",
+      "Don't use marker red for anything but errors and delete.",
+      "Don't set Caveat for buttons, titles or body text.",
+      "Don't cover the mannequin with a sheet or menu."
+    ]
+  }
+}
