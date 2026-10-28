@@ -1,15 +1,19 @@
 // "To review" inbox (F2, F3): photos the AI has processed, the ones still in the queue, and the ones that failed.
+import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import '../styles/wardrobe.css';
-import { goBack, navigate } from '../app/router';
+import { goBack, navigate, useRoute } from '../app/router';
 import { db } from '../data/db';
 import { removeJob, retryJob } from '../data/queue';
+import { useQueueView, type QueueRow } from '../data/queueView';
 import { useReviewItems } from '../data/repo';
-import type { Item, QueueJob } from '../domain/types';
-import { useI18n } from '../i18n';
-import { CutoutImg, Empty, ProgressBar } from '../ui/parts';
+import type { Item, QueueError } from '../domain/types';
+import { useI18n, type Key } from '../i18n';
+import { useAction } from '../ui/action';
+import { CutoutImg, Empty } from '../ui/parts';
 import { Icon } from '../ui/icons';
-import { AiMark, usePhotos } from '../wardrobe/parts';
+import { AiMark, ConfirmSheet, QueuePhoto, usePhotos } from '../wardrobe/parts';
+import { failureInfo, type FailAction } from '../wardrobe/queueErrors';
 
 /** "Rust · Autumn, Winter": colours, then seasons ("All year" for all four). */
 function useItemSummary() {
@@ -23,8 +27,9 @@ function useItemSummary() {
 
 export default function ReviewInbox() {
   const { t, tn } = useI18n();
+  const route = useRoute();
   const items = useReviewItems();
-  const jobs = useLiveQuery(() => db.queue.orderBy('createdAt').toArray(), []);
+  const jobs = useQueueView();
   const sameIds = useLiveQuery(async () => {
     const ids = (items ?? []).map((it) => it.suggestion?.sameItemId).filter((x): x is string => !!x);
     const found = await db.items.bulkGet(ids);
@@ -32,12 +37,18 @@ export default function ReviewInbox() {
   }, [items]);
   const photos = usePhotos((items ?? []).map((it) => it.tryOnPhotoId));
   const summary = useItemSummary();
+  const [retake, setRetake] = useState<string | null>(null);
+  const act = useAction('review.job', async (what: FailAction, id: string) => {
+    if (what === 'retry') await retryJob(id);
+    else await removeJob(id);
+    if (what === 'retake') navigate('/add');
+  }, { errorText: t('state.actionFailed'), retryLabel: t('action.retry') });
 
   if (!items || !jobs) return <div className="screen" />;
   const pending = jobs.filter((j) => j.state === 'waiting' || j.state === 'working');
   const failed = jobs.filter((j) => j.state === 'failed');
-  const finished = jobs.length - pending.length;
   const nothing = items.length === 0 && pending.length === 0 && failed.length === 0;
+  const pendingLabel = tn('wardrobe.review.processing', pending.length);
 
   return (
     <div className="screen wd">
@@ -50,17 +61,14 @@ export default function ReviewInbox() {
       </div>
 
       <div className="stack gap-12 wd-col">
+        {/* Each photo still in the queue, with its own state (bug-audit #16). */}
         {pending.length > 0 && (
-          <section className="card wd-proc" aria-label={tn('wardrobe.review.processing', pending.length)}>
-            <span className="wd-proc__stack" aria-hidden="true">
-              <span /><span><Icon name="scissors" size={22} /></span>
-            </span>
-            <div className="grow stack gap-4">
-              <span className="title-card wd-proc__title">{tn('wardrobe.review.processing', pending.length)}</span>
-              <ProgressBar value={Math.max(0.06, jobs.length ? finished / jobs.length : 0)}
-                label={t('wardrobe.review.progressLabel', { i: Math.min(finished + 1, jobs.length), n: jobs.length })} />
-              <span className="meta">{t('wardrobe.review.keepOpen')}</span>
-            </div>
+          <section className="card wd-proc">
+            <span className="title-card wd-proc__title" aria-hidden="true">{pendingLabel}</span>
+            <ul className="wd-pending" aria-label={pendingLabel}>
+              {pending.map((j) => <li key={j.id} className={`wd-jobthumb wd-jobthumb--${j.state}`}><QueuePhoto row={j} /></li>)}
+            </ul>
+            <span className="meta">{t('wardrobe.review.keepOpen')}</span>
           </section>
         )}
 
@@ -87,32 +95,56 @@ export default function ReviewInbox() {
                 </li>
               );
             })}
-            {failed.map((j) => <FailedRow key={j.id} job={j} />)}
+            {failed.map((j) => (
+              <FailedRow key={j.id} job={j} target={route.query.get('job') === j.id} busy={act.busy}
+                onAction={(what) => (what === 'retake' ? setRetake(j.id) : what === 'models' ? navigate('/models') : void act.run(what, j.id))} />
+            ))}
           </ul>
         )}
       </div>
+
+      {retake && (
+        <ConfirmSheet title={t('wardrobe.review.retakeTitle')} confirm={t('wardrobe.review.retake')}
+          onConfirm={() => void act.run('retake', retake)} onClose={() => setRetake(null)} />
+      )}
     </div>
   );
 }
 
-function FailedRow({ job }: { job: QueueJob }) {
+const FAIL_TEXT: Record<QueueError, [Key, Key]> = {
+  'no-garment': ['wardrobe.review.failed', 'wardrobe.review.failedHint'],
+  models: ['wardrobe.review.notReady', 'wardrobe.review.notReadyHint'],
+  network: ['wardrobe.review.failNetwork', 'wardrobe.review.failNetworkHint'],
+  storage: ['wardrobe.review.failStorage', 'wardrobe.review.failStorageHint'],
+  'photo-lost': ['wardrobe.review.failLost', 'wardrobe.review.failLostHint'],
+  unreadable: ['wardrobe.review.failUnreadable', 'wardrobe.review.failUnreadableHint'],
+  other: ['wardrobe.review.failOther', 'wardrobe.review.failOtherHint'],
+};
+
+/** A photo that didn't make it: the photo itself, why, and what to do about it (bug-audit #16). */
+function FailedRow({ job, target, busy, onAction }: { job: QueueRow; target: boolean; busy: boolean; onAction: (what: FailAction) => void }) {
   const { t } = useI18n();
-  const notReady = /not (implemented|ready|downloaded)|model/i.test(job.error ?? '');
+  const { kind, primary } = failureInfo(job);
+  const [title, hint] = FAIL_TEXT[kind];
+  const ref = useRef<HTMLLIElement>(null);
+  // Opened from its thumbnail in the camera strip: bring the row into view.
+  useEffect(() => { if (target) ref.current?.scrollIntoView({ block: 'center' }); }, [target]);
+  const secondary: FailAction | null = primary === 'models' ? 'retry' : primary === 'remove' ? null : 'remove';
+  const label: Record<FailAction, Key> = { retake: 'wardrobe.review.retake', models: 'wardrobe.review.downloadModels', retry: 'wardrobe.review.retry', remove: 'wardrobe.review.remove' };
+  const icon = { retake: 'camera', models: 'download', retry: 'rotate', remove: 'trash' } as const;
   return (
-    <li className="wd-failrow">
-      <span className="wd-thumb wd-thumb--fail" aria-hidden="true"><Icon name="warning" size={26} /></span>
+    <li ref={ref} className={`wd-failrow${target ? ' wd-failrow--target' : ''}`}>
+      <span className="wd-thumb wd-jobthumb wd-jobthumb--failed"><QueuePhoto row={job} /></span>
       <span className="grow stack gap-8">
         <span className="stack wd-rowtext">
-          <span className="wd-rowtitle">{notReady ? t('wardrobe.review.notReady') : t('wardrobe.review.failed')}</span>
-          <span className="wd-rowmeta">{notReady ? t('wardrobe.review.notReadyHint') : t('wardrobe.review.failedHint')}</span>
+          <span className="wd-rowtitle">{t(title)}</span>
+          <span className="wd-rowmeta">{t(hint)}</span>
         </span>
-        <span className="row gap-8">
-          <button type="button" className="btn btn--secondary btn--sm wd-btn-sm" onClick={async () => { await removeJob(job.id); navigate('/add'); }}>
-            <Icon name="camera" size={18} />{t('wardrobe.review.retake')}
+        <span className="row gap-8 wd-failrow__actions">
+          <button type="button" className="btn btn--secondary btn--sm wd-btn-sm" disabled={busy} onClick={() => onAction(primary)}>
+            <Icon name={icon[primary]} size={18} />{t(label[primary])}
           </button>
-          <button type="button" className="btn btn--secondary btn--sm wd-btn-sm" onClick={() => retryJob(job.id)}>
-            <Icon name="rotate" size={18} />{t('wardrobe.review.retry')}
-          </button>
+          {secondary && <button type="button" className="text-action" disabled={busy} onClick={() => onAction(secondary)}>{t(label[secondary])}</button>}
         </span>
       </span>
     </li>

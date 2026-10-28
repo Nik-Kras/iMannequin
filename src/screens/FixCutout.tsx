@@ -1,18 +1,21 @@
 // Fix the cut-out (F4, D19): compare other background-removal models side by side, or brush by hand.
 import { useEffect, useRef, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import '../styles/wardrobe.css';
-import { goBack, navigate } from '../app/router';
+import { goBack, navigate, useRoute } from '../app/router';
 import * as ai from '../ai';
 import type { CutoutResult, ModelInfo } from '../ai';
-import { getSettings, updateSettings } from '../data/db';
-import { deleteItem, useItem, usePhoto } from '../data/repo';
+import { db, getSettings, updateSettings } from '../data/db';
+import { deleteItem } from '../data/repo';
 import { useI18n } from '../i18n';
+import { useAction } from '../ui/action';
 import { CutoutImg, Empty, PenCircle } from '../ui/parts';
 import { Icon } from '../ui/icons';
 import { BrushEditor, type BrushApi, type BrushTool } from '../wardrobe/BrushEditor';
 import { makeThumb } from '../wardrobe/images';
 import { saveCutout, setCutoutApproved } from '../wardrobe/ops';
-import { XIcon } from '../wardrobe/parts';
+import { ConfirmSheet, XIcon } from '../wardrobe/parts';
+import { clearDraft } from '../wardrobe/session';
 
 interface Candidate {
   id: string;
@@ -30,10 +33,24 @@ async function onPhone(m: ModelInfo): Promise<boolean> {
   return check ? check(m.id).catch(() => false) : true;
 }
 
+/** Goes back one screen, then runs `then` once the previous screen is current (a sheet's own entry is skipped). */
+function stepBackThen(then: () => void) {
+  const from = location.hash;
+  const on = () => {
+    if (location.hash === from) return;
+    window.removeEventListener('popstate', on);
+    then();
+  };
+  window.addEventListener('popstate', on);
+  history.back();
+}
+
 export default function FixCutout({ itemId }: { itemId?: string }) {
-  const { t } = useI18n();
-  const item = useItem(itemId);
-  const photo = usePhoto(item?.tryOnPhotoId);
+  const { t, lang } = useI18n();
+  const route = useRoute();
+  // null = not in the database (a deleted item, an old link), undefined = still loading (bug-audit #25).
+  const item = useLiveQuery(async () => (itemId ? (await db.items.get(itemId)) ?? null : null), [itemId]);
+  const photo = useLiveQuery(async () => (item?.tryOnPhotoId ? (await db.photos.get(item.tryOnPhotoId)) ?? null : item === undefined ? undefined : null), [item?.tryOnPhotoId, item === undefined]);
   const [view, setView] = useState<'models' | 'brush'>('models');
   const [cands, setCands] = useState<Candidate[]>([]);
   const [picked, setPicked] = useState('current');
@@ -41,7 +58,7 @@ export default function FixCutout({ itemId }: { itemId?: string }) {
   const [size, setSize] = useState(24);
   const [hist, setHist] = useState({ canUndo: false, canRedo: false });
   const [zoom, setZoom] = useState(1);
-  const [busy, setBusy] = useState(false);
+  const [confirmRetake, setConfirmRetake] = useState(false);
   const brush = useRef<BrushApi>(null);
   const photoRef = useRef(photo);
   photoRef.current = photo;
@@ -98,11 +115,40 @@ export default function FixCutout({ itemId }: { itemId?: string }) {
     if (p && cut) setBrushSrc({ key: brushKey, cutout: cut, original: p.original });
   }, [view, brushKey, picked, cands, brushSrc?.key]);
 
+  const use = useAction('fix.use', async () => {
+    if (!photo || !item) return;
+    const current = cands.find((c) => c.id === picked);
+    if (view === 'brush') {
+      const out = await brush.current?.export();
+      if (out) await saveCutout(photo.id, { cutout: out.blob, thumb: await makeThumb(out.blob), width: out.width, height: out.height, model: picked === 'current' ? photo.cutoutModel : picked });
+    } else if (picked !== 'current' && current?.result) {
+      const r = current.result;
+      await saveCutout(photo.id, { cutout: r.cutout, thumb: await makeThumb(r.cutout), width: r.width, height: r.height, model: r.model });
+      // The board promises the pick is remembered in Model lab: it becomes the cut-out model.
+      const s = await getSettings();
+      await updateSettings({ models: { ...s.models, cutout: r.model } });
+    } else {
+      await setCutoutApproved(photo.id, true);
+    }
+    goBack(`/item/${item.id}`);
+  }, { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
+
+  // A new photo of a saved item comes back through same-item detection (D43); a review photo is replaced.
+  const retake = useAction('fix.retake', async () => {
+    if (!item) return;
+    if (item.status !== 'review') { navigate('/add', { replace: true }); return; }
+    await deleteItem(item.id);
+    clearDraft(item.id);
+    // The item screen behind this one is gone: replace it, so Close in the camera returns to the inbox (bug-audit #21).
+    if (route.query.get('from') === 'item') stepBackThen(() => navigate('/add', { replace: true }));
+    else navigate('/add', { replace: true });
+  }, { errorText: t('state.actionFailed'), retryLabel: t('action.retry') });
+
   if (!item || !photo) {
     return (
       <div className="screen screen--no-tabs wd">
         <div className="header"><button type="button" className="back" onClick={() => goBack('/wardrobe')}><Icon name="back" size={20} strokeWidth={2} />{t('action.back')}</button></div>
-        {item === undefined ? null : <Empty icon="wardrobe">{t('wardrobe.item.notFound')}</Empty>}
+        {item === undefined || photo === undefined ? null : <Empty icon="wardrobe">{t('wardrobe.item.notFound')}</Empty>}
       </div>
     );
   }
@@ -111,35 +157,7 @@ export default function FixCutout({ itemId }: { itemId?: string }) {
   const pickedBlob = picked === 'current' ? photo.cutout : current?.result?.cutout;
   const bigLabel = current?.label ?? t('wardrobe.fix.current');
   const otherCount = cands.length - 1;
-
-  async function use() {
-    if (!photo || !item) return;
-    setBusy(true);
-    try {
-      if (view === 'brush') {
-        const out = await brush.current?.export();
-        if (out) await saveCutout(photo.id, { cutout: out.blob, thumb: await makeThumb(out.blob), width: out.width, height: out.height, model: picked === 'current' ? photo.cutoutModel : picked });
-      } else if (picked !== 'current' && current?.result) {
-        const r = current.result;
-        await saveCutout(photo.id, { cutout: r.cutout, thumb: await makeThumb(r.cutout), width: r.width, height: r.height, model: r.model });
-        // The board promises the pick is remembered in Model lab: it becomes the cut-out model.
-        const s = await getSettings();
-        await updateSettings({ models: { ...s.models, cutout: r.model } });
-      } else {
-        await setCutoutApproved(photo.id, true);
-      }
-    } finally {
-      setBusy(false);
-    }
-    goBack(`/item/${item.id}`);
-  }
-
-  async function retake() {
-    if (!item) return;
-    // A new photo of a saved item comes back through same-item detection (D43); a review photo is replaced.
-    if (item.status === 'review') await deleteItem(item.id);
-    navigate('/add', { replace: true });
-  }
+  const seconds = new Intl.NumberFormat(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   return (
     <div className="screen screen--no-tabs wd wd-fix">
@@ -164,7 +182,7 @@ export default function FixCutout({ itemId }: { itemId?: string }) {
                 const blob = c.id === 'current' ? photo.cutout : c.result?.cutout;
                 const ready = c.state === 'current' || c.state === 'done';
                 const note = c.state === 'current' ? t('wardrobe.fix.inUse')
-                  : c.state === 'done' ? t('wardrobe.fix.seconds', { s: ((c.result?.ms ?? 0) / 1000).toFixed(1) })
+                  : c.state === 'done' ? t('wardrobe.fix.seconds', { s: seconds.format((c.result?.ms ?? 0) / 1000) })
                   : c.state === 'failed' ? t('wardrobe.fix.failed') : c.state === 'running' ? t('wardrobe.fix.running')
                   : c.state === 'idle' ? (c.sizeMb ? t('wardrobe.fix.download', { mb: c.sizeMb }) : t('wardrobe.fix.tapToRun')) : t('wardrobe.fix.waiting');
                 return (
@@ -217,9 +235,14 @@ export default function FixCutout({ itemId }: { itemId?: string }) {
       </div>
 
       <div className="wd-fix__actions">
-        <button type="button" className="btn btn--secondary grow" onClick={retake}>{t('wardrobe.fix.retake')}</button>
-        <button type="button" className="btn btn--primary wd-grow12" disabled={busy || !pickedBlob} onClick={use}>{t('wardrobe.fix.use')}</button>
+        <button type="button" className="btn btn--secondary grow" disabled={retake.busy}
+          onClick={() => (item.status === 'review' ? setConfirmRetake(true) : void retake.run())}>{t('wardrobe.fix.retake')}</button>
+        <button type="button" className="btn btn--primary wd-grow12" disabled={use.busy || !pickedBlob} onClick={() => void use.run()}>{t('wardrobe.fix.use')}</button>
       </div>
+      {confirmRetake && (
+        <ConfirmSheet title={t('wardrobe.review.retakeTitle')} body={t('wardrobe.review.retakeBody')} confirm={t('wardrobe.review.retake')}
+          onConfirm={() => void retake.run()} onClose={() => setConfirmRetake(false)} />
+      )}
     </div>
   );
 }

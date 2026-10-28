@@ -5,6 +5,7 @@ import { goBack } from '../app/router';
 import { useActiveItems, useLocations } from '../data/repo';
 import type { Item, Location } from '../domain/types';
 import { useI18n } from '../i18n';
+import { useAction } from '../ui/action';
 import { CutoutImg } from '../ui/parts';
 import { Icon } from '../ui/icons';
 import { deletePlace, movePlace, renamePlace } from '../wardrobe/ops';
@@ -16,6 +17,10 @@ export default function Places() {
   const items = useActiveItems();
   const [editing, setEditing] = useState(false);
   const [sheet, setSheet] = useState<{ kind: 'add' } | { kind: 'edit'; place: Location } | { kind: 'delete'; place: Location } | null>(null);
+  const failed = { errorText: t('state.saveFailed'), retryLabel: t('action.retry') };
+  const rename = useAction('places.rename', async (id: string, name: string) => { await renamePlace(id, name); setSheet(null); }, failed);
+  const reorder = useAction('places.move', (id: string, dir: -1 | 1) => movePlace(id, dir), failed);
+  const remove = useAction('places.delete', (id: string) => deletePlace(id), failed);
 
   const byPlace = useMemo(() => {
     const m = new Map<string, Item[]>();
@@ -81,8 +86,8 @@ export default function Places() {
                       <PlaceTag name={p.name} tilt={tiltFor(i) * 1.4} />
                       <span className="meta">{label}</span>
                     </span>
-                    <button type="button" className="icon-btn icon-btn--tissue" aria-label={t('wardrobe.places.up', { name: p.name })} disabled={i === 0} onClick={() => movePlace(p.id, -1)}><XIcon name="up" /></button>
-                    <button type="button" className="icon-btn icon-btn--tissue" aria-label={t('wardrobe.places.down', { name: p.name })} disabled={i === places.length - 1} onClick={() => movePlace(p.id, 1)}><XIcon name="down" /></button>
+                    <button type="button" className="icon-btn icon-btn--tissue" aria-label={t('wardrobe.places.up', { name: p.name })} disabled={i === 0} onClick={() => void reorder.run(p.id, -1)}><XIcon name="up" /></button>
+                    <button type="button" className="icon-btn icon-btn--tissue" aria-label={t('wardrobe.places.down', { name: p.name })} disabled={i === places.length - 1} onClick={() => void reorder.run(p.id, 1)}><XIcon name="down" /></button>
                     <button type="button" className="icon-btn icon-btn--tissue" aria-label={t('wardrobe.places.editPlace', { name: p.name })} onClick={() => setSheet({ kind: 'edit', place: p })}><XIcon name="pencil" /></button>
                   </div>
                 ) : (
@@ -125,7 +130,7 @@ export default function Places() {
       {sheet?.kind === 'edit' && (
         <TitledSheet title={sheet.place.name} onClose={() => setSheet(null)}>
           <NewPlaceForm initial={sheet.place.name} submitLabel={t('wardrobe.places.rename')}
-            onDone={async (_id, name) => { if (name) await renamePlace(sheet.place.id, name); setSheet(null); }} />
+            onDone={(_id, name) => (name ? void rename.run(sheet.place.id, name) : setSheet(null))} />
           <button type="button" className="btn btn--danger btn--block" onClick={() => setSheet({ kind: 'delete', place: sheet.place })}>
             <Icon name="trash" size={20} />{t('wardrobe.places.delete')}
           </button>
@@ -136,7 +141,7 @@ export default function Places() {
         return (
           <ConfirmSheet title={t('wardrobe.places.confirmDelete', { name: sheet.place.name })}
             body={n ? tn('wardrobe.places.deleteHint', n) : t('wardrobe.places.deleteEmpty')}
-            confirm={t('action.delete')} onConfirm={() => deletePlace(sheet.place.id)} onClose={() => setSheet(null)} />
+            confirm={t('action.delete')} onConfirm={() => void remove.run(sheet.place.id)} onClose={() => setSheet(null)} />
         );
       })()}
     </div>

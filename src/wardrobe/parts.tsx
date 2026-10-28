@@ -2,9 +2,11 @@
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
+import type { QueueRow } from '../data/queueView';
 import { CATEGORIES } from '../domain/taxonomy';
-import type { CategoryId, ColourName, Location, Photo } from '../domain/types';
+import type { CategoryId, ColourName, Location, Photo, QueueState } from '../domain/types';
 import { useI18n } from '../i18n';
+import { useAction } from '../ui/action';
 import { Sheet } from '../ui/parts';
 import { Icon } from '../ui/icons';
 import { CATEGORY_GROUPS, groupOf } from './filters';
@@ -69,6 +71,65 @@ export function usePhotos(ids: (string | undefined)[]): Map<string, Photo> {
   return m;
 }
 
+// Object URLs keyed by what the picture is (a queue job, a photo version), not by the Blob object: live
+// queries re-read their rows on every change, and a new URL per Blob re-decoded every thumbnail (bug-audit #11).
+interface KeyedUrl { url?: string; pending?: Promise<string | undefined>; users: number }
+const keyedUrls = new Map<string, KeyedUrl>();
+
+export function useKeyedBlobUrl(key: string | undefined, blob: Blob | undefined): string | undefined {
+  const [url, setUrl] = useState(() => (key ? keyedUrls.get(key)?.url : undefined));
+  const has = !!blob;
+  useEffect(() => {
+    if (!key || !blob) { setUrl(undefined); return; }
+    let e = keyedUrls.get(key);
+    if (!e) keyedUrls.set(key, (e = { users: 0 }));
+    const entry = e;
+    entry.users++;
+    let live = true;
+    // WebKit can fail object URLs of Blobs that IndexedDB keeps on disk, so the bytes are copied first.
+    entry.pending ??= blob.arrayBuffer().then((buf) => {
+      const u = URL.createObjectURL(new Blob([buf], { type: blob.type || 'image/jpeg' }));
+      if (keyedUrls.get(key) !== entry) { URL.revokeObjectURL(u); return undefined; }
+      return (entry.url = u);
+    }, () => { entry.pending = undefined; return undefined; });
+    void entry.pending.then((u) => { if (live) setUrl(u); });
+    return () => {
+      live = false;
+      entry.users--;
+      // Released a little later: the next screen often shows the same picture.
+      setTimeout(() => {
+        if (entry.users > 0 || keyedUrls.get(key) !== entry) return;
+        keyedUrls.delete(key);
+        if (entry.url) URL.revokeObjectURL(entry.url);
+      }, 4000);
+    };
+    // Follows the key: a re-read of the same picture is a new Blob object with the same bytes.
+  }, [key, has]);
+  return url;
+}
+
+const STATE_ICON: Record<QueueState, ReactNode> = {
+  waiting: <XIcon name="clock" size={13} strokeWidth={2.4} />,
+  working: <Icon name="scissors" size={13} strokeWidth={2.2} />,
+  done: <Icon name="check" size={13} strokeWidth={2.6} />,
+  failed: <Icon name="warning" size={13} strokeWidth={2.2} />,
+};
+
+/** A queue photo (its small preview) with its state as a badge; the state is also said in words for VoiceOver. */
+export function QueuePhoto({ row, cutout }: { row: QueueRow; cutout?: { key: string; blob?: Blob } }) {
+  const { t } = useI18n();
+  const photoUrl = useKeyedBlobUrl(cutout ? undefined : `job:${row.id}`, row.image);
+  const cutUrl = useKeyedBlobUrl(cutout?.key, cutout?.blob);
+  return (
+    <>
+      {cutout ? cutUrl && <img className="cutout" src={cutUrl} alt="" style={{ width: 48, height: 44 }} draggable={false} />
+        : photoUrl && <img src={photoUrl} alt="" draggable={false} />}
+      <span className="wd-jobthumb__badge" aria-hidden="true">{STATE_ICON[row.state]}</span>
+      <span className="sr-only">{t(`wardrobe.add.state.${row.state}`)}</span>
+    </>
+  );
+}
+
 /** A luggage tag with a place name (design: places are written by hand, in Caveat). */
 export function PlaceTag({ name, tilt = -1.2, small }: { name: string; tilt?: number; small?: boolean }) {
   return <span className={`wd-tag${small ? ' wd-tag--sm' : ''}`} style={{ transform: `rotate(${tilt}deg)` }}>{name}</span>;
@@ -94,7 +155,7 @@ export function TitledSheet({ title, onClose, children, footer }: { title: strin
   );
 }
 
-export function CategorySheet({ value, onPick, onClose }: { value: CategoryId; onPick: (c: CategoryId) => void; onClose: () => void }) {
+export function CategorySheet({ value, onPick, onClose }: { value?: CategoryId; onPick: (c: CategoryId) => void; onClose: () => void }) {
   const { t } = useI18n();
   return (
     <TitledSheet title={t('wardrobe.item.category')} onClose={onClose}>
@@ -167,13 +228,15 @@ export function NewPlaceForm({ onDone, initial = '', submitLabel }: { onDone: (i
   const [name, setName] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => { ref.current?.focus(); }, []);
+  // One place per tap, however fast the second tap comes (bug-audit #23).
+  const add = useAction('places.add', async (n: string) => onDone(await addPlace(n), n), { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
   return (
-    <form className="stack gap-8" onSubmit={async (e) => {
+    <form className="stack gap-8" onSubmit={(e) => {
       e.preventDefault();
       const n = name.trim();
-      if (!n) return;
+      if (!n || add.busy) return;
       if (submitLabel) { onDone(undefined, n); return; }
-      onDone(await addPlace(n), n);
+      void add.run(n);
     }}>
       <label className="field">
         <span className="field__label">{t('wardrobe.item.newPlaceName')}</span>
@@ -181,7 +244,7 @@ export function NewPlaceForm({ onDone, initial = '', submitLabel }: { onDone: (i
       </label>
       <div className="row gap-8">
         <button type="button" className="btn btn--secondary btn--sm grow" onClick={() => onDone()}>{t('action.cancel')}</button>
-        <button type="submit" className="btn btn--primary btn--sm grow" disabled={!name.trim()}>{submitLabel ?? t('action.add')}</button>
+        <button type="submit" className="btn btn--primary btn--sm grow" disabled={!name.trim() || add.busy}>{submitLabel ?? t('action.add')}</button>
       </div>
     </form>
   );

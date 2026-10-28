@@ -5,6 +5,7 @@ import { goBack } from '../app/router';
 import { useActiveItems, useLocations } from '../data/repo';
 import { SEASONS, type Season } from '../domain/types';
 import { useI18n } from '../i18n';
+import { useAction } from '../ui/action';
 import { CutoutImg, Empty, Toast } from '../ui/parts';
 import { Icon } from '../ui/icons';
 import { moveItems } from '../wardrobe/ops';
@@ -19,7 +20,11 @@ export default function SeasonSwap() {
   const [dest, setDest] = useState<string>();
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const move = useAction('swap.move', async (ids: string[], to: string, place: string) => {
+    await moveItems(ids, to);
+    setOverrides({});
+    setToast(tn('wardrobe.swap.moved', ids.length, { place }));
+  }, { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
 
   const order = useMemo(() => (places ?? []).map((p) => p.id), [places]);
   const candidates = useMemo(() => swapCandidates(items ?? [], season, order), [items, season, order]);
@@ -32,15 +37,6 @@ export default function SeasonSwap() {
   const destName = placeName(dest);
   const n = selected.length;
   const setAll = (v: boolean) => setOverrides(Object.fromEntries(candidates.map((it) => [it.id, v])));
-
-  async function move() {
-    if (!dest || !n || !destName) return;
-    setBusy(true);
-    await moveItems(selected, dest);
-    setBusy(false);
-    setOverrides({});
-    setToast(tn('wardrobe.swap.moved', n, { place: destName }));
-  }
 
   return (
     <div className="screen screen--no-tabs wd wd-swap">
@@ -100,7 +96,8 @@ export default function SeasonSwap() {
       )}
 
       <section className="wd-movebar" aria-label={t('wardrobe.swap.title')}>
-        <button type="button" className="btn btn--primary btn--block wd-btn-lg" disabled={!n || !dest || busy} onClick={move}>
+        <button type="button" className="btn btn--primary btn--block wd-btn-lg" disabled={!n || !dest || !destName || move.busy}
+          onClick={() => dest && destName && void move.run(selected, dest, destName)}>
           <XIcon name="box" size={20} />
           <span className="wd-ellipsis">{!n ? t('wardrobe.swap.choose') : !destName ? t('wardrobe.swap.choosePlace') : tn('wardrobe.swap.move', n, { place: destName })}</span>
         </button>

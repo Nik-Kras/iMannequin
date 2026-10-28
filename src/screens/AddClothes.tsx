@@ -1,21 +1,23 @@
 // Add clothes (F2, D20): a camera loop. Each snap joins the processing queue at once and the camera stays open.
 // Falls back to the phone's own camera (file input) when the live camera isn't available or allowed.
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import '../styles/wardrobe.css';
 import { goBack } from '../app/router';
-import { db } from '../data/db';
+import { db, withReopen } from '../data/db';
 import { enqueuePhotos } from '../data/queue';
+import { useQueueView, type QueueRow } from '../data/queueView';
 import { useItem, usePhoto, useReviewItems } from '../data/repo';
-import type { QueueJob } from '../domain/types';
+import { reportError } from '../diag/diagnostics';
 import { useI18n } from '../i18n';
-import { CutoutImg, Toast, useBlobUrl } from '../ui/parts';
+import { notify } from '../ui/action';
 import { Icon } from '../ui/icons';
 import { captureFrame, downscaleToJpeg } from '../wardrobe/images';
-import { TitledSheet, XIcon } from '../wardrobe/parts';
+import { QueuePhoto, TitledSheet } from '../wardrobe/parts';
 import { ModelsNeeded } from '../ai/ui';
 
 type CamState = 'starting' | 'live' | 'denied' | 'unavailable';
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 const TIPS = ['wardrobe.add.tip.tops', 'wardrobe.add.tip.bottoms', 'wardrobe.add.tip.shoes'] as const;
 
 export default function AddClothes() {
@@ -27,10 +29,11 @@ export default function AddClothes() {
   const [tip, setTip] = useState(0);
   const [flash, setFlash] = useState(0);
   const [guide, setGuide] = useState(false);
-  const [toast, setToast] = useState<string>();
-  const jobs = useLiveQuery(() => db.queue.orderBy('createdAt').toArray(), []);
+  const [importing, setImporting] = useState<{ i: number; n: number }>();
+  const jobs = useQueueView();
   const review = useReviewItems();
-  const firstVisit = useLiveQuery(async () => (await db.items.count()) === 0 && (await db.queue.count()) === 0, []);
+  const noItems = useLiveQuery(async () => (await db.items.count()) === 0, []);
+  const firstVisit = noItems && jobs?.length === 0;
 
   // Live rear camera; stopped when leaving the screen.
   useEffect(() => {
@@ -83,22 +86,58 @@ export default function AddClothes() {
     if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
   }, [count]);
 
+  /** Puts photos in the queue. A write can fail on iOS (bug-audit #3): the caller says so and offers Retry. */
+  async function store(blobs: Blob[]): Promise<boolean> {
+    try {
+      await withReopen(() => enqueuePhotos(blobs));
+      return true;
+    } catch (err) {
+      reportError(err, 'add.store');
+      return false;
+    }
+  }
+  const storeFailed = (retry: () => void) =>
+    notify({ text: t('wardrobe.add.photoFailed'), actionLabel: t('action.retry'), action: retry, ms: 8000 });
+
   async function snap() {
     const v = videoRef.current;
     if (!v || cam !== 'live' || !v.videoWidth) return;
-    setFlash((n) => n + 1);
-    const blob = await captureFrame(v);
-    await enqueuePhotos([blob]);
+    let blob: Blob;
+    try {
+      blob = await captureFrame(v);
+    } catch (err) {
+      reportError(err, 'add.capture');
+      notify({ text: t('wardrobe.add.photoFailed'), ms: 8000 });
+      return;
+    }
+    // The flash means "kept": it fires only once the photo is in the queue.
+    const keep = async () => { if (await store([blob])) setFlash((n) => n + 1); else storeFailed(() => void keep()); };
+    await keep();
   }
 
   async function onFiles(e: ChangeEvent<HTMLInputElement>) {
-    const files = [...(e.target.files ?? [])].filter((f) => f.type.startsWith('image/') || f.type === '');
+    const all = [...(e.target.files ?? [])];
     e.target.value = '';
-    if (!files.length) return;
-    const blobs: Blob[] = [];
-    for (const f of files) blobs.push(await downscaleToJpeg(f));
-    await enqueuePhotos(blobs);
-    setToast(tn('wardrobe.add.added', blobs.length));
+    // HEIC from some pickers has no type; anything else that isn't an image is counted, not dropped silently.
+    const files = all.filter((f) => f.type.startsWith('image/') || f.type === '');
+    await importFiles(files, all.length - files.length);
+  }
+
+  /** Each photo joins the queue as soon as it's scaled down, so the strip fills while the rest follow (bug-audit #11). */
+  async function importFiles(files: File[], notPhotos: number) {
+    let added = 0;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        setImporting({ i: i + 1, n: files.length });
+        const blob = await downscaleToJpeg(files[i]);
+        if (!(await store([blob]))) { storeFailed(() => void importFiles(files.slice(i), 0)); return; }
+        added++;
+      }
+    } finally {
+      setImporting(undefined);
+    }
+    const said = [added ? tn('wardrobe.add.added', added) : '', notPhotos ? tn('wardrobe.add.notPhotos', notPhotos) : ''].filter(Boolean);
+    if (said.length) notify({ text: said.join(' · '), ms: 4000 });
   }
 
   const left = (jobs ?? []).filter((j) => j.state === 'waiting' || j.state === 'working').length;
@@ -114,7 +153,7 @@ export default function AddClothes() {
         {fallback && (
           <div className="wd-cam__fallback">
             <Icon name="camera" size={34} />
-            <p className="body">{cam === 'denied' ? t('wardrobe.add.denied') : t('wardrobe.add.noCamera')}</p>
+            <p className="body">{cam === 'denied' ? t(IOS ? 'wardrobe.add.deniedIos' : 'wardrobe.add.denied') : t('wardrobe.add.noCamera')}</p>
             {cam === 'unavailable' && <p className="wd-cam__hint">{t('wardrobe.add.noCameraHint')}</p>}
             <label className="btn btn--primary">
               <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={onFiles} />
@@ -141,9 +180,10 @@ export default function AddClothes() {
       <section className="wd-cam__panel" aria-label={t('wardrobe.add.queueLabel')}>
         <div className="wd-cam__status">
           <span className="wd-cam__left" aria-live="polite">
-            {left > 0 ? t('wardrobe.add.left', { n: left }) : count > 0 ? t('wardrobe.add.allDone') : t('wardrobe.add.idle')}
+            {importing ? t('wardrobe.add.importing', importing)
+              : left > 0 ? t('wardrobe.add.left', { n: left }) : count > 0 ? t('wardrobe.add.allDone') : t('wardrobe.add.idle')}
           </span>
-          {left > 0 && <span className="meta">{t('wardrobe.add.keepOpen')}</span>}
+          {(left > 0 || importing) && <span className="meta">{t('wardrobe.add.keepOpen')}</span>}
         </div>
         <ul className="wd-cam__strip" ref={stripRef}>
           {recent.map((j) => <JobThumb key={j.id} job={j} />)}
@@ -178,30 +218,21 @@ export default function AddClothes() {
           </ul>
         </TitledSheet>
       )}
-      {toast && <Toast onDone={() => setToast(undefined)}>{toast}</Toast>}
     </div>
   );
 }
 
-const STATE_ICON: Record<QueueJob['state'], ReactNode> = {
-  waiting: <XIcon name="clock" size={13} strokeWidth={2.4} />,
-  working: <Icon name="scissors" size={13} strokeWidth={2.2} />,
-  done: <Icon name="check" size={13} strokeWidth={2.6} />,
-  failed: <Icon name="warning" size={13} strokeWidth={2.2} />,
-};
-
-/** One photo in the queue strip, with its state as a small badge. */
-function JobThumb({ job }: { job: QueueJob }) {
+/** One photo in the queue strip. A finished one opens its review item, a failed one its row in the inbox (bug-audit #16). */
+function JobThumb({ job }: { job: QueueRow }) {
   const { t } = useI18n();
   const item = useItem(job.state === 'done' ? job.itemId : undefined);
   const photo = usePhoto(item?.tryOnPhotoId);
-  const url = useBlobUrl(job.state === 'done' && photo ? undefined : job.blob);
+  const cut = photo?.thumb ?? photo?.cutout;
+  const body = <QueuePhoto row={job} cutout={job.state === 'done' && photo ? { key: `photo:${photo.id}:${cut?.size}`, blob: cut } : undefined} />;
+  const href = job.state === 'done' && item ? `#/item/${item.id}` : job.state === 'failed' ? `#/review?job=${job.id}` : undefined;
   return (
-    <li className={`wd-jobthumb wd-jobthumb--${job.state}`} aria-label={t(`wardrobe.add.state.${job.state}`)}>
-      {job.state === 'done' && photo
-        ? <CutoutImg blob={photo.thumb ?? photo.cutout} alt="" style={{ width: 48, height: 44 }} />
-        : url && <img src={url} alt="" />}
-      <span className="wd-jobthumb__badge" aria-hidden="true">{STATE_ICON[job.state]}</span>
+    <li className={`wd-jobthumb wd-jobthumb--${job.state}`}>
+      {href ? <a className="wd-jobthumb__link" href={href} aria-label={t(`wardrobe.add.state.${job.state}`)}>{body}</a> : body}
     </li>
   );
 }

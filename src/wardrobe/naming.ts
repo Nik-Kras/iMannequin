@@ -22,7 +22,7 @@ const UK_ADJ_OVERRIDE: Partial<Record<ColourName, string>> = { denim: 'джин�
 
 const cap = (s: string) => (s ? s[0].toLocaleUpperCase() + s.slice(1) : s);
 /** Lower-cases the first letter of a noun, but keeps "T-shirt" as it is. */
-const lowerNoun = (s: string) => (/^\p{Lu}-/u.test(s) ? s : s ? s[0].toLocaleLowerCase() + s.slice(1) : s);
+export const lowerNoun = (s: string) => (/^\p{Lu}-/u.test(s) ? s : s ? s[0].toLocaleLowerCase() + s.slice(1) : s);
 
 /** Inflects a Ukrainian masculine adjective (-ий hard, -ій soft) for gender/number; undefined if indeclinable (хакі). */
 export function ukAdjective(masc: string, g: Gender): string | undefined {

@@ -71,3 +71,28 @@ export function usedBrands(items: Item[]): string[] {
   }
   return [...counts.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name)).map((x) => x.name);
 }
+
+/**
+ * The wardrobe's filters and search in its URL (#/wardrobe?group=tops&colour=red,navy&q=…), so they are still
+ * there when the user comes back from an item (bug-audit #18). Other screens link here with ?place= and ?notWorn=1.
+ */
+export function filterToQuery(f: WardrobeFilter, q?: string): string {
+  const p = new URLSearchParams();
+  if (f.group !== 'all') p.set('group', f.group);
+  if (f.colours.length) p.set('colour', f.colours.join(','));
+  if (f.seasons.length) p.set('season', f.seasons.join(','));
+  if (f.place) p.set('place', f.place);
+  if (f.notWorn) p.set('notWorn', '1');
+  if (q) p.set('q', q);
+  return p.toString();
+}
+
+export function filterFromQuery(p: URLSearchParams): WardrobeFilter {
+  const list = <T extends string>(key: string) => (p.get(key) ?? '').split(',').filter(Boolean) as T[];
+  const group = p.get('group') as CategoryGroup | null;
+  return {
+    group: group && (CATEGORY_GROUPS as readonly string[]).includes(group) ? group : 'all',
+    colours: list<ColourName>('colour'), seasons: list<Season>('season'),
+    place: p.get('place') ?? undefined, notWorn: p.get('notWorn') === '1',
+  };
+}
