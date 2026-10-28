@@ -16,3 +16,6 @@ public/vendor/
 !.env.example
 !.env.production
 .env.sentry-build-plugin
+
+# /brag video sources and renders (the finished video lives in docs/)
+brag-output*/
