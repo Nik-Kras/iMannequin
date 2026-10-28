@@ -57,9 +57,9 @@ export type { Slot };
 
 // Extra exports for the try-on screens (Dress-up, See all, Adjust fit, Body photo).
 export { MannequinStage, STAGE_PAD, type StageLayout, type StageProps } from './Mannequin';
-export { saveBodyRecord } from './process';
+export { prepareBodyPhoto, saveBodyRecord } from './process';
 export { useBody, type LoadedBody } from './assets';
 export { calloutPoints, zoneRects } from './zones';
 export { fitGarment, offsetForHandle, isNeutralFit, NEUTRAL_FIT, type Placement, type Handle } from './fit';
-export { armAngles, LM, CANON as CANONICAL } from './body';
+export { armAngles, LM, POSE_LIMITS, CANON as CANONICAL } from './body';
 export { DESIGN_BODY_PATH, DESIGN_HEAD } from './defaultBody';

@@ -48,7 +48,8 @@ export async function runPose(photo: Blob, modelPath: string): Promise<PoseOutpu
     const values = seg.getAsFloat32Array();
     const mw = seg.width, mh = seg.height;
     seg.close();
-    const mask = maskToImageData(values, mw, mh, bitmap.width, bitmap.height);
+    // The mask stays at the model's resolution; the body photo code scales it when drawing (bug-audit #9).
+    const mask = maskToImageData(values, mw, mh);
     return {
       landmarks: points.map((p) => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility ?? 0 })),
       mask,
@@ -64,18 +65,13 @@ export async function runPose(photo: Blob, modelPath: string): Promise<PoseOutpu
   }
 }
 
-/** Confidence (0–1) mask to grey ImageData at the photo's size: r = g = b = a = confidence × 255. */
-export function maskToImageData(values: Float32Array, mw: number, mh: number, width: number, height: number): ImageData {
-  const out = new ImageData(width, height);
+/** Confidence (0–1) mask to grey ImageData at the mask's own size: r = g = b = a = confidence × 255. */
+export function maskToImageData(values: Float32Array, mw: number, mh: number): ImageData {
+  const out = new ImageData(mw, mh);
   const d = out.data;
-  for (let y = 0; y < height; y++) {
-    const sy = Math.min(mh - 1, Math.floor((y * mh) / height));
-    for (let x = 0; x < width; x++) {
-      const sx = Math.min(mw - 1, Math.floor((x * mw) / width));
-      const v = Math.round(Math.min(1, Math.max(0, values[sy * mw + sx])) * 255);
-      const i = (y * width + x) * 4;
-      d[i] = d[i + 1] = d[i + 2] = d[i + 3] = v;
-    }
+  for (let i = 0; i < mw * mh; i++) {
+    const v = Math.round(Math.min(1, Math.max(0, values[i])) * 255);
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = d[i * 4 + 3] = v;
   }
   return out;
 }

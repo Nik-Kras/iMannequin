@@ -7,12 +7,22 @@ import type { BodyRecord, Landmark } from '../domain/types';
 import { canonicalLandmarks, canonicalTransform, checkPose, bodyMetrics, metricsToRecord, CANON, LM, type PoseIssue } from './body';
 import { ctx2d, makeCanvas, maskFromImageData } from './assets';
 import { maskBounds } from './raster';
+import { downscaleToJpeg } from '../wardrobe/images';
 
 const toBlob = async (c: HTMLCanvasElement | OffscreenCanvas, type = 'image/png'): Promise<Blob> =>
   'convertToBlob' in c ? c.convertToBlob({ type }) : new Promise<Blob>((res, rej) => (c as HTMLCanvasElement).toBlob((b) => (b ? res(b) : rej(new Error('toBlob'))), type));
 
 /** Points the canonical canvas can't be built without. */
 const CORE = [LM.shoulderL, LM.shoulderR, LM.ankleL, LM.ankleR, LM.heelL, LM.heelR];
+
+/**
+ * The body photo as kept from the moment it's picked or shot: a JPEG with a 2048 px long edge, copied into memory
+ * (architecture §3). A 24–48 MP original decoded at full size took 0.8–1.6 GB, and iOS can revoke a picked file
+ * once the picker is gone (bug-audit #9).
+ */
+export async function prepareBodyPhoto(file: Blob): Promise<Blob> {
+  return inMemory(await downscaleToJpeg(file, 2048));
+}
 
 export async function processBodyPhoto(photo: Blob): Promise<{ body?: BodyRecord; issues: PoseIssue[] }> {
   let pose: Awaited<ReturnType<typeof detectPose>>;
