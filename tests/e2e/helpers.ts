@@ -163,6 +163,8 @@ export async function openApp(page: Page, { seed = false, onboarded = true, lang
   // boot() drops ?seed from the URL once the sample wardrobe is stored.
   await page.waitForFunction(() => (window as unknown as { __imq?: unknown }).__imq && !location.search.includes('seed'));
   await withDb(page, `let s; while (!(s = await db.settings.get('app'))) await new Promise((r) => setTimeout(r, 50)); await db.settings.put({ ...s, lang: '${lang}', installGuideDismissed: true, onboarded: ${onboarded}, modelsReady: true });`);
+  // Let the first page finish registering the service worker: WebKit reports the aborted sw.js fetch as a page error.
+  await page.evaluate(() => Promise.race([navigator.serviceWorker?.ready, new Promise((r) => setTimeout(r, 3000))]));
   await page.goto(`./?e2e#${route}`);
   await page.waitForFunction(() => (window as unknown as { __imq?: unknown }).__imq);
 }
