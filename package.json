@@ -6,8 +6,8 @@
   "scripts": {
     "vendor": "node scripts/copy-vendor.mjs",
     "dev": "node scripts/copy-vendor.mjs && vite --host",
-    "build": "node scripts/copy-vendor.mjs && tsc -b && vite build",
-    "preview": "vite preview --host --port 4173",
+    "build": "node scripts/copy-vendor.mjs && tsc -b && vite build && node scripts/postbuild.mjs",
+    "preview": "vite preview --host --port 4183 --strictPort",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "e2e": "playwright test",

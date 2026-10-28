@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { I18nProvider, useI18n } from '../i18n';
 import { useSettings, ensureDefaultPlaces } from '../data/repo';
+import { getSettings } from '../data/db';
 import { startQueueRunner } from '../data/queue';
 import { Toast } from '../ui/parts';
 import { TabBar } from './TabBar';
@@ -70,11 +71,17 @@ function Shell() {
   const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW();
 
   useEffect(() => startQueueRunner(), []);
+  // Each screen opens at the top (the window keeps its scroll otherwise).
+  useEffect(() => { window.scrollTo(0, 0); }, [route.path]);
+  useEffect(() => { if (settings) document.documentElement.lang = settings.lang; }, [settings?.lang]);
   useEffect(() => {
     if (!settings) return;
     void ensureDefaultPlaces(settings.lang);
     void navigator.storage?.persist?.();
-    if (!settings.onboarded && !ONBOARDING.includes(route.parts[0])) navigate('/welcome', { replace: true });
+    // Read the stored value: the live settings can lag a screen that has just finished onboarding.
+    if (!settings.onboarded && !ONBOARDING.includes(route.parts[0])) {
+      void getSettings().then((fresh) => { if (!fresh.onboarded) navigate('/welcome', { replace: true }); });
+    }
   }, [settings, route.parts]);
 
   if (!settings) return null;

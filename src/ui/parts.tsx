@@ -132,9 +132,21 @@ export function useBlobUrl(blob?: Blob | null): string | undefined {
   const [url, setUrl] = useState<string>();
   useEffect(() => {
     if (!blob) { setUrl(undefined); return; }
-    const u = URL.createObjectURL(blob);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
+    let u: string | undefined;
+    let live = true;
+    // WebKit can fail object URLs made from Blobs that IndexedDB keeps on disk
+    // ("WebKitBlobResource error 1"), so the bytes are copied into memory first.
+    void blob.arrayBuffer().then((buf) => {
+      if (!live) return;
+      u = URL.createObjectURL(new Blob([buf], { type: blob.type || 'image/png' }));
+      setUrl(u);
+    }).catch(() => { if (live) setUrl(undefined); });
+    return () => {
+      live = false;
+      const old = u;
+      // Revoke a little later: the <img> keeps the old URL until the next render.
+      if (old) setTimeout(() => URL.revokeObjectURL(old), 4000);
+    };
   }, [blob]);
   return url;
 }

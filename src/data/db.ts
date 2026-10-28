@@ -1,8 +1,12 @@
 // IndexedDB via Dexie. Everything stays on the phone (R1); backup.ts exports it to a file (R6).
 import Dexie, { type Table } from 'dexie';
 import type {
-  AppSettings, BodyRecord, CalibrationRun, Item, Location, Outfit, Photo, QueueJob, Trip, WearEntry,
+  AppSettings, BodyRecord, CalibrationRun, GarmentAnchors, Item, Location, Outfit, Photo, QueueJob, Trip, WearEntry,
 } from '../domain/types';
+
+/** Garment anchors cached per photo. Kept apart from Photo so caching them never rewrites a record
+ *  that holds Blobs: on WebKit, reads in flight while such a record is rewritten get dead Blob handles. */
+export interface AnchorCache { photoId: string; anchors: GarmentAnchors }
 
 export class IMannequinDB extends Dexie {
   items!: Table<Item, string>;
@@ -15,6 +19,7 @@ export class IMannequinDB extends Dexie {
   queue!: Table<QueueJob, string>;
   settings!: Table<AppSettings, string>;
   calibration!: Table<CalibrationRun, string>;
+  anchors!: Table<AnchorCache, string>;
 
   constructor(name = 'imannequin') {
     super(name);
@@ -30,6 +35,7 @@ export class IMannequinDB extends Dexie {
       settings: 'id',
       calibration: 'id, task, modelId, createdAt',
     });
+    this.version(2).stores({ anchors: 'photoId' });
   }
 }
 

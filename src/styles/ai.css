@@ -1,0 +1,86 @@
+/* AI module screens: model download (onboarding) and the Model lab. Built on the paper kit in global.css. */
+
+/* ---------- Shared ---------- */
+.ai-steps { display: flex; gap: 6px; height: 24px; align-items: center; }
+.ai-steps span { width: 28px; height: 4px; border-radius: 2px; background: var(--pencil); }
+.ai-steps span.on { background: var(--ink); }
+.ai-bar { height: 8px; border-radius: 4px; background: var(--pencil); overflow: hidden; }
+.ai-bar > span { display: block; height: 100%; background: var(--ink); border-radius: 4px; transition: width 300ms ease-out; }
+.ai-minibar { display: block; margin-top: 6px; height: 4px; border-radius: 2px; background: var(--paper); overflow: hidden; }
+.ai-minibar > span { display: block; height: 100%; background: var(--ink); transition: width 300ms ease-out; }
+.ai-error { font: 500 14px/1.4 var(--font-text); color: var(--marker); }
+
+/* ---------- Model download ---------- */
+.ai-dl {
+  display: flex; flex-direction: column; gap: 24px;
+  padding: calc(var(--safe-top) + 36px) var(--gutter) calc(var(--safe-bottom) + 28px);
+}
+.ai-dl__top { display: flex; flex-direction: column; gap: 18px; }
+.ai-dl__top > .back { align-self: flex-start; margin: -8px 0 -6px; }
+.ai-dl__total { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; }
+.ai-dl__size { font: 400 26px/1.15 var(--font-display); }
+.ai-dl__wifi { display: flex; align-items: center; gap: 8px; font: 500 14px/1.3 var(--font-text); text-align: right; white-space: pre-line; }
+.ai-dl__rows { list-style: none; margin: 0; padding: 0 16px; }
+.ai-dl__row { display: flex; gap: 12px; padding: 14px 0; }
+.ai-dl__row + .ai-dl__row { border-top: 1px solid var(--rule); }
+.ai-dl__row > svg { margin-top: 1px; }
+.ai-dl__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ai-dl__line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ai-dl__title { font: 600 15px/1.3 var(--font-text); }
+.ai-dl__right { font: 500 14px var(--font-text); white-space: nowrap; }
+.ai-dl__what { font: 400 14px/1.35 var(--font-text); }
+.ai-dl__bottom { margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
+.ai-dl__cta { height: 54px; font-size: 17px; box-shadow: var(--shadow-lift); }
+.ai-dl__later { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-dl__later .text-action { flex: none; font-size: 15px; padding: 0 4px; }
+.ai-dl__progress { display: flex; justify-content: space-between; gap: 12px; font: 500 14px var(--font-text); }
+.ai-dl__ready { display: flex; align-items: center; gap: 16px; padding-left: 4px; }
+.ai-dl__ready .stamp { flex: none; height: auto; padding: 2px 12px; transform: rotate(-7deg); }
+.ai-dl__readytext { font: 400 14px/1.4 var(--font-text); }
+
+/* ---------- Model lab ---------- */
+.ai-lab { display: flex; flex-direction: column; gap: 16px; padding-inline: 16px; }
+.ai-lab .header { padding-inline: 0; }
+.ai-lab__intro { display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+.ai-lab__intro p { font: 400 15.5px/1.45 var(--font-text); }
+.ai-lab__hero {
+  display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: var(--r-card);
+  background: var(--carbon); color: var(--sheet); box-shadow: 1px 2px 3px rgba(20, 20, 20, 0.18);
+}
+.ai-lab__hero p { font: 400 15px/1.45 var(--font-text); }
+.ai-lab__hero .meta { color: var(--on-carbon-2); }
+.ai-lab__calibrate { height: 50px; border: 0; border-radius: var(--r-button); background: var(--sheet); color: var(--ink); font: 600 16px var(--font-text); display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ai-lab__calibrate:disabled { opacity: 0.5; }
+.ai-lab__hero :focus-visible { outline-color: var(--sheet); }
+.ai-lab__run { display: flex; flex-direction: column; gap: 8px; }
+.ai-lab__runline { display: flex; align-items: center; justify-content: space-between; gap: 12px; font: 500 14px var(--font-text); }
+.ai-lab__runline .text-action { color: var(--sheet); padding: 0 4px; }
+.ai-lab__hero .ai-bar { background: #3a3835; }
+.ai-lab__hero .ai-bar > span { background: var(--sheet); }
+
+.ai-task { padding: 14px 16px 4px; }
+.ai-task h2 { font: 400 21px/1.15 var(--font-display); }
+.ai-task__what { margin: 3px 0 4px; }
+.ai-task ul { list-style: none; margin: 0; padding: 0; }
+.ai-model { padding: 10px 0; border-top: 1px solid var(--rule); }
+.ai-model__main { display: flex; align-items: center; gap: 12px; }
+.ai-model__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ai-model__name { font: 600 15px/1.3 var(--font-text); }
+.ai-model__name .meta { font-weight: 400; margin-left: 5px; white-space: nowrap; }
+.ai-model__result { font: 400 13.5px/1.35 var(--font-text); }
+.ai-model__result--idle { color: var(--graphite); }
+.ai-model__use { flex: none; height: 44px; min-width: 64px; padding: 0 14px; border-radius: var(--r-button); border: 1.5px solid var(--ink); background: var(--sheet); font: 600 14px var(--font-text); }
+.ai-model__use:disabled { opacity: 0.4; }
+.ai-model .stamp { flex: none; height: auto; padding: 1px 10px; font-size: 19px; line-height: 1.25; transform: rotate(-5deg); margin-right: 4px; }
+.ai-model__extra { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; min-height: 22px; margin-top: 2px; }
+.ai-model__extra .text-action { padding: 0; min-height: 44px; margin: -11px 0; font-size: 13px; color: var(--graphite); }
+.ai-model__extra .text-action:hover { color: var(--ink); }
+.ai-model__thumbs { display: flex; gap: 8px; overflow-x: auto; padding: 6px 2px 4px; scrollbar-width: none; }
+.ai-model__thumbs::-webkit-scrollbar { display: none; }
+.ai-model__thumb { flex: none; width: 52px; height: 52px; border-radius: var(--r-thumb); background: var(--tissue); display: flex; align-items: center; justify-content: center; padding: 4px; }
+.ai-model__note { font: 400 13px/1.4 var(--font-text); color: var(--graphite); font-style: italic; }
+
+.ai-lab__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; }
+.ai-lab__foot .meta { line-height: 1.4; }
+.ai-lab__foot .text-action { flex: none; padding: 0 0 0 8px; }
+.ai-lab__export { display: flex; flex-direction: column; gap: 6px; padding: 0 4px; }

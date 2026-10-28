@@ -9,13 +9,13 @@ export default defineConfig({
   use: {
     ...devices['iPhone 15 Pro'],
     browserName: 'webkit',
-    baseURL: 'http://localhost:4173/iMannequin/',
+    baseURL: 'http://localhost:4183/iMannequin/',
     locale: 'en-GB',
     timezoneId: 'Europe/London',
   },
   webServer: {
     command: 'pnpm build && pnpm preview',
-    url: 'http://localhost:4173/iMannequin/',
+    url: 'http://localhost:4183/iMannequin/',
     reuseExistingServer: true,
     timeout: 240_000,
   },

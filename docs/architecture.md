@@ -42,15 +42,17 @@ Every model is chosen by calibration (D12). The candidates below are what the Mo
 
 | Task | Used for | Candidates ⚑ | Fallback |
 |---|---|---|---|
-| Garment background removal | F2, F4 | BiRefNet-lite (MIT), IS-Net / DIS (Apache-2.0), U²-Net (Apache-2.0) | **Plain-background fast path in code:** sample the border colour and flood-fill by colour distance. Used when the background is clean, and as a quick preview |
+| Garment background removal | F2, F4 | BiRefNet-lite (MIT, `onnx-community/BiRefNet_lite-ONNX`, 109 MB WebGPU / 214 MB WASM), ORMBG ⚑ (Apache-2.0, `onnx-community/ormbg-ONNX`, IS-Net architecture, 84 / 168 MB). On GPUs that allow only 10 storage buffers per shader (desktop Chrome), BiRefNet-lite can't run, and the app falls back to ORMBG | **Plain-background fast path in code:** sample the border colour and flood-fill by colour distance. Used when the background is clean, and as a quick preview |
 | Body cut-out | F1 | MediaPipe Pose Landmarker segmentation mask (Apache-2.0), MediaPipe multiclass selfie segmenter (Apache-2.0), BiRefNet (MIT) | Retake guide |
 | Body key points | F1, try-on | MediaPipe Pose Landmarker lite / full / heavy (Apache-2.0) | Drag the key points by hand on the Check screen |
-| Category, seasons | F3 | Zero-shot image–text models: FashionCLIP (MIT), Marqo-FashionSigLIP (Apache-2.0), CLIP ViT-B/32 (MIT), SigLIP (Apache-2.0) | The user picks |
+| Category, seasons | F3 | Zero-shot image–text models: CLIP ViT-B/32 (MIT, `Xenova/clip-vit-base-patch32`, 122 / 149 MB, default), FashionCLIP (MIT, `rshelby17/fashion-clip-onnx`, 228 MB) | The user picks |
 | Colours | F3 | **Plain code:** cluster the cut-out's pixels (k-means) and map them to a named palette | n/a |
 | Same-item detection | F11 | Image embeddings from the classifier model. Cosine similarity within the same zone, then a stricter second check (colour histogram + a high threshold set during calibration) | The user decides |
 | Search by description | F5 | The query text and the item photos are compared with the same image–text model. A **small on-device language model** turns a free-form query into filters ("warm", "winter", "in the sofa"): Qwen3-1.7B (Apache-2.0, default candidate), Qwen2.5-1.5B-Instruct (Apache-2.0), Qwen3-0.6B (Apache-2.0, light fallback); loaded only when a query needs it, after plain keyword filters (D32). Optional item descriptions from a small vision-language model: Florence-2 base (MIT), SmolVLM-256M (Apache-2.0) | Plain filters |
 
-**Excluded:** BRIA RMBG models (non-commercial licence), and Llama and Gemma models (their licences aren't MIT/Apache/BSD).
+**Excluded:** BRIA RMBG models (non-commercial licence); `onnx-community/ISNet-ONNX` (AGPL-3.0 on the Hub); U²-Net (no web-ready conversion); Llama and Gemma models (their licences aren't MIT/Apache/BSD); Qwen2.5-3B (Qwen licence, not Apache).
+
+**Search model sizes:** Qwen3-1.7B 1.34 GB (WebGPU) / 2.0 GB (WASM), Qwen2.5-1.5B 1.14 / 1.67 GB, Qwen3-0.6B 552 / 885 MB. Florence-2 base: 215 / 265 MB. Pose: MediaPipe lite 5.5 MB and full 9 MB, self-hosted in `public/models/`.
 
 ### 4.1 Classification details ⚑
 - **Prompts:** one English prompt per category ("a photo of a pair of jeans"). The text embeddings are computed once and cached, so classifying a photo needs only the image encoder.

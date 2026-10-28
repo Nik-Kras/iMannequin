@@ -1,10 +1,13 @@
+<p align="center"><img src="public/icon-192.png" width="96" alt="iM logo"></p>
+
 <h1 align="center">iMannequin</h1>
 
 <p align="center"><b>Your wardrobe on a paper mannequin of yourself.</b><br>
 Photograph your clothes, let on-device AI sort them, and try outfits on before you put them on.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-in%20design-111" alt="Status: in design">
+  <a href="https://github.com/Nik-Kras/iMannequin/actions/workflows/deploy.yml"><img src="https://github.com/Nik-Kras/iMannequin/actions/workflows/deploy.yml/badge.svg" alt="Deploy"></a>
+  <img src="https://img.shields.io/badge/status-beta-111" alt="Status: beta">
   <img src="https://img.shields.io/badge/PWA-iPhone%20%7C%20Android-111?logo=pwa&logoColor=white" alt="PWA for iPhone and Android">
   <img src="https://img.shields.io/badge/AI-on%20device-555" alt="AI runs on the device">
   <img src="https://img.shields.io/badge/server-none-555" alt="No server">
@@ -12,7 +15,31 @@ Photograph your clothes, let on-device AI sort them, and try outfits on before y
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-> **Status:** product decisions are recorded and the visual design is next. There's nothing to install yet; this page will get a QR code, screenshots and a demo once the first version is out.
+## Install
+
+<table><tr>
+<td><img src="docs/install-qr.png" width="180" alt="QR code for https://nik-kras.github.io/iMannequin/"></td>
+<td>
+
+**Scan with your phone's camera**, or open **[nik-kras.github.io/iMannequin](https://nik-kras.github.io/iMannequin/)**.
+
+- **iPhone:** in Safari, tap Share → **Add to Home Screen**.
+- **Android:** in Chrome, tap the menu → **Install app**.
+
+It's free, there's no account, and after the first launch it works offline.
+
+</td>
+</tr></table>
+
+> **Status: beta.** Every feature is in. AI model choices are being calibrated on real phones through the in-app Model lab (Settings → Model lab).
+
+<p align="center">
+  <img src="docs/screenshots/dressup.png" width="200" alt="Dress-up: the mannequin with a slot column for each part of the outfit">
+  <img src="docs/screenshots/dressup-open.png" width="200" alt="Dress-up with the clothes row open for the top layers">
+  <img src="docs/screenshots/wardrobe.png" width="200" alt="Wardrobe grid with filters and storage places">
+  <img src="docs/screenshots/settings.png" width="200" alt="Settings with language, mannequin mode and privacy options">
+</p>
+<p align="center"><sub>Screenshots use the synthetic sample wardrobe (drawn garments and an outline mannequin), never real photos.</sub></p>
 
 ## What it does
 
@@ -21,7 +48,7 @@ Photograph your clothes, let on-device AI sort them, and try outfits on before y
 3. **Dress up.** Tap the torso, legs, feet or head on your mannequin and everything you own for that part slides up. Swipe through it to see each piece on you, layer a shirt, sweater and coat, and save the outfit.
 4. **Know what you have and where it is.** Every item can have a storage place, like "under the bed" or "in the sofa". Search by description, see what you haven't worn in months, move a whole season into storage at once, and build packing lists for trips.
 
-## Planned features
+## Features
 
 - **Paper-doll try-on:** garments are scaled to your body and keep their own proportions, so a cropped top looks cropped and a midi dress ends below the knee. Fix a fit once by dragging its handles, and it's remembered for that garment.
 - **AI that suggests, never decides:** cut-out, category, colours, seasons and name are pre-filled, and you can change all of them. A bad cut-out can be retried with another model or fixed with an erase / restore brush.
@@ -48,13 +75,25 @@ flowchart LR
     fit --> doll([Paper-doll outfit])
 ```
 
-Everything runs in the browser on the phone: React and TypeScript, IndexedDB for storage, Transformers.js and MediaPipe for the AI models, installed as a Progressive Web App and hosted on GitHub Pages. Details: [architecture](docs/architecture.md) and [try-on](docs/try-on.md).
+Everything runs in the browser on the phone: React and TypeScript, IndexedDB for storage, Transformers.js (WebGPU, or WebAssembly as the fallback) and MediaPipe for the AI models, installed as a Progressive Web App and hosted on GitHub Pages. The AI runtimes and pose models are served from this site, not a CDN. Details: [architecture](docs/architecture.md) and [try-on](docs/try-on.md).
 
 ## Privacy
 
 - **Your photos never leave your phone.** There's no server, no account and no analytics.
 - The only network traffic is downloading the app and its AI models. The one exception is the weather hint, and only if you switch it on: it sends a location to the free Open-Meteo service.
 - Deleting the app deletes your wardrobe, so the app makes backup files you keep yourself (iCloud Drive, Google Drive, anywhere).
+
+## Development
+
+```bash
+pnpm install
+pnpm dev          # http://localhost:5173/iMannequin/  (add ?seed to load the sample wardrobe)
+pnpm test         # unit tests (Vitest)
+pnpm e2e          # end-to-end tests in WebKit on an iPhone profile (Playwright)
+pnpm build        # production build in dist/
+```
+
+Pushing to `main` builds and deploys to GitHub Pages.
 
 ## Documentation
 

@@ -1,12 +1,16 @@
 // Shared reads and writes. Feature modules add their own helpers next to their screens.
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, DEFAULT_PLACES, getSettings, newId, updateSettings } from './db';
+import { db, DEFAULT_PLACES, defaultSettings, getSettings, newId, updateSettings } from './db';
 import type { AppSettings, Item, Location, OutfitDraft, Photo, Slot } from '../domain/types';
 import { CATEGORY, placeItem } from '../domain/taxonomy';
 import { translate } from '../i18n';
 
+/** Settings, read-only (live queries can't write). boot() creates the record before the first render. */
 export function useSettings(): AppSettings | undefined {
-  return useLiveQuery(() => getSettings(), []);
+  return useLiveQuery(async () => {
+    const s = await db.settings.get('app');
+    return s ? { ...defaultSettings(s.lang), ...s } : undefined;
+  }, []);
 }
 
 export function useActiveItems(): Item[] | undefined {
@@ -41,7 +45,9 @@ export async function saveItem(item: Item): Promise<void> {
 
 /** Deletes an item, its photos, and removes it from outfits, the draft and trips. */
 export async function deleteItem(id: string): Promise<void> {
-  await db.transaction('rw', [db.items, db.photos, db.outfits, db.trips, db.settings], async () => {
+  await db.transaction('rw', [db.items, db.photos, db.outfits, db.trips, db.settings, db.anchors], async () => {
+    const photoIds = (await db.photos.where('itemId').equals(id).primaryKeys()) as string[];
+    await db.anchors.bulkDelete(photoIds);
     await db.photos.where('itemId').equals(id).delete();
     await db.items.delete(id);
     const outfits = await db.outfits.toArray();

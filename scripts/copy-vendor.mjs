@@ -22,7 +22,8 @@ const ortDist = join(tf.slice(0, tf.indexOf(marker)), 'node_modules/onnxruntime-
 await mkdir(join(out, 'ort'), { recursive: true });
 let n = 0;
 for (const f of await readdir(ortDist)) {
-  if (/^ort-wasm-simd-threaded.*\.(wasm|mjs)$/.test(f)) {
+  // The worker uses the plain build on WASM and the asyncify build on WebGPU (src/ai/worker.ts).
+  if (/^ort-wasm-simd-threaded(\.asyncify)?\.(wasm|mjs)$/.test(f)) {
     await cp(join(ortDist, f), join(out, 'ort', f));
     n++;
   }

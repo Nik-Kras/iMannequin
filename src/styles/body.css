@@ -1,0 +1,67 @@
+/* Body photo (boards BodyGuide guide and check). Built on the paper kit in global.css. */
+.bp { display: flex; flex-direction: column; padding-bottom: calc(var(--safe-bottom) + 24px); }
+.bp__steps { display: flex; align-items: center; height: 24px; padding-top: 22px; padding-bottom: 6px; }
+.bp__dots { display: flex; gap: 6px; }
+.bp__dots span { width: 22px; height: 4px; border-radius: 2px; background: var(--ink); }
+.bp__body { display: flex; flex-direction: column; gap: 16px; padding-top: 10px; }
+.bp__body .h1 { font-size: 32px; line-height: 1.1; }
+.bp__guide {
+  position: relative; height: 300px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 2px 3px 3px rgba(20, 20, 20, 0.14); transform: rotate(-0.4deg);
+}
+.bp__figure { height: 270px; overflow: visible; }
+.bp__dash { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.bp__arms { position: absolute; right: 26px; top: 120px; font: 500 21px/1 var(--font-hand); transform: rotate(4deg); }
+.bp__feet { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); font: 500 19px/1 var(--font-hand); white-space: nowrap; }
+.bp__tips { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.bp__tips li { display: flex; gap: 10px; align-items: flex-start; font: 400 15px/1.35 var(--font-text); }
+.bp__tips svg { flex: none; }
+.bp__privacy { display: flex; gap: 8px; align-items: flex-start; font: 400 13.5px/1.4 var(--font-text); color: var(--graphite); }
+.bp__privacy svg { flex: none; color: var(--ink); }
+.bp__actions { margin-top: auto; padding: 24px var(--gutter) 10px; display: flex; flex-direction: column; gap: 10px; }
+.bp__primary { height: 54px; font-size: 17px; }
+.bp__skip { align-self: center; }
+
+.bp__check-card {
+  position: relative; height: 376px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  box-shadow: 2px 3px 3px rgba(20, 20, 20, 0.14);
+}
+.bp__photo { max-height: 350px; max-width: 100%; object-fit: contain; }
+.bp__skeleton { position: relative; height: 350px; aspect-ratio: 920 / 1900; }
+.bp__skeleton svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.bp__skeleton-img image { filter: drop-shadow(0 0 1px #fff) drop-shadow(1px 2px 1.5px rgba(20, 20, 20, 0.2)); }
+.bp__scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--ink); opacity: 0.6;
+  animation: bp-scan 1.6s ease-in-out infinite alternate;
+}
+@keyframes bp-scan { to { transform: translateY(374px); } }
+.bp__checks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.bp__checks li { display: flex; gap: 10px; align-items: flex-start; font: 400 15px/1.4 var(--font-text); }
+.bp__checks li.is-issue { font-weight: 500; }
+.bp__tick {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--sheet);
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.bp__warn { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex: none; }
+.bp__issue { display: flex; gap: 10px; align-items: flex-start; font: 500 15px/1.4 var(--font-text); }
+.bp__issue svg { flex: none; }
+
+/* Camera with the self-timer: dark, full screen. */
+.bp-cam { position: fixed; inset: 0; z-index: 40; background: var(--carbon); color: var(--sheet); overflow: hidden; }
+.bp-cam__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bp-cam__video.is-mirror { transform: scaleX(-1); }
+.bp-cam__guide {
+  position: absolute; left: 50%; top: 50%; height: 68%; transform: translate(-50%, -54%); overflow: visible; pointer-events: none;
+  fill: none; stroke: #fff; stroke-width: 1.6; stroke-dasharray: 5 4; stroke-linejoin: round; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+}
+.bp-cam__top {
+  position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: center;
+  padding: calc(var(--safe-top) + 10px) 16px 0 var(--gutter);
+}
+.bp-cam__text { color: var(--sheet); }
+.bp-cam__count {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font: 400 120px/1 var(--font-display); color: var(--sheet); text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5); pointer-events: none;
+}
+.bp-cam__bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 var(--gutter) calc(var(--safe-bottom) + 24px); display: flex; flex-direction: column; gap: 12px; }
+.bp-cam__hint { font: 500 15px/1.4 var(--font-text); text-align: center; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }

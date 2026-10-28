@@ -13,7 +13,7 @@ const TABS: { path: string; icon: IconName; key: 'tab.dressup' | 'tab.wardrobe' 
 export function TabBar({ current }: { current: string }) {
   const { t } = useI18n();
   const tab = (x: (typeof TABS)[number]) => (
-    <a key={x.path} href={`#${x.path}`} className="tab" aria-current={current.startsWith(x.path) ? 'page' : undefined}
+    <a key={x.path} href={`#${x.path}`} className="tab" aria-current={current.startsWith(x.path) || (x.path === '/outfits' && current === '/wear-log') || (x.path === '/wardrobe' && current === '/review') ? 'page' : undefined}
       onClick={(e) => { e.preventDefault(); navigate(x.path, { replace: true }); }}>
       <span className="tab__icon"><Icon name={x.icon} /></span>
       {t(x.key)}
