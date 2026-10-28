@@ -4,13 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { navigate } from '../app/router';
 import { db, newId } from '../data/db';
-import { setDraft, todayISO, useActiveItems, useSettings } from '../data/repo';
+import { todayISO, useActiveItems, useSettings } from '../data/repo';
 import { useWeather } from '../data/weather';
 import { CATEGORY, categoriesForSlot, placeItem, type DressupSlot } from '../domain/taxonomy';
 import type { Item, OutfitDraft, Slot } from '../domain/types';
 import { useI18n, type Key } from '../i18n';
+import { deleteWear, logWear } from '../life/wear';
 import { MannequinStage, calloutPoints, useBody } from '../tryon';
-import { GarmentThumb, isWorn, putOn, takeOff, useItemPhotos, useMatchingOutfit, useViewport } from '../tryon/ui';
+import { editDraft, GarmentThumb, isWorn, putOn, takeOff, useItemPhotos, useMatchingOutfit, useViewport } from '../tryon/ui';
+import { attempt, useAction } from '../ui/action';
 import { Icon } from '../ui/icons';
 import { IconButton, Sheet, Stamp, Toast } from '../ui/parts';
 import '../styles/dressup.css';
@@ -18,16 +20,26 @@ import '../styles/dressup.css';
 type Open = DressupSlot | 'acc';
 type TopLayer = 'base' | 'mid' | 'outer';
 
-const SLOT_H = 46;
-const TOP_H = 84;
-const GAP = 6;
+/**
+ * Slot sizes, roomiest first. The column takes the first that fits between the header and the bottom panel; the last
+ * drops the Top slot's layer thumbnails (an open row has the layer switch). Targets stay ≥ 44 px.
+ */
+const TIERS = [
+  { slot: 46, top: 84, gap: 6 },
+  { slot: 44, top: 72, gap: 4 },
+  { slot: 44, top: 68, gap: 2 },
+  { slot: 44, top: 44, gap: 2 },
+];
+const ORDER: DressupSlot[] = ['head', 'neck', 'top', 'hands', 'legs', 'feet'];
 const EMPTY_DRAFT: OutfitDraft = { slots: {}, accessories: [], toggles: { tuckIn: false, intoBoots: false } };
+const BODY_CARD_HIDDEN = 'imq.bodyCard.hidden';
 
 const LABEL: Record<DressupSlot, Key> = { head: 'zone.head', neck: 'zone.neck', top: 'zone.top', hands: 'zone.hands', legs: 'zone.legs', feet: 'zone.feet' };
 const ADD: Record<DressupSlot, Key> = { head: 'dressup.add.head', neck: 'dressup.add.neck', top: 'dressup.add.top', hands: 'dressup.add.hands', legs: 'dressup.add.legs', feet: 'dressup.add.feet' };
 
 /** The draft slot a Dress-up slot (and Top layer tab) edits. */
 const slotOf = (open: Open, layer: TopLayer): Slot | 'acc' => (open === 'top' ? layer : open);
+const sameItems = (a: string[], b: string[]) => [...a].sort().join(',') === [...b].sort().join(',');
 
 export default function DressUp() {
   const { t } = useI18n();
@@ -35,6 +47,7 @@ export default function DressUp() {
   const items = useActiveItems();
   const draft = settings?.draft ?? EMPTY_DRAFT;
   const body = useBody();
+  const bodies = useLiveQuery(() => db.body.count(), []);
   const weather = useWeather();
   const matched = useMatchingOutfit(settings?.draft);
   const vp = useViewport();
@@ -44,6 +57,7 @@ export default function DressUp() {
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [saving, setSaving] = useState(false);
   const [freshStamp, setFreshStamp] = useState(false);
+  const [cardHidden, setCardHidden] = useState(() => { try { return localStorage.getItem(BODY_CARD_HIDDEN) === '1'; } catch { return false; } });
 
   // Items on the mannequin (they may not be in the active list, e.g. archived since).
   const draftIds = useMemo(() => [...new Set([...Object.values(draft.slots), ...draft.accessories].filter(Boolean) as string[])], [draft]);
@@ -55,15 +69,30 @@ export default function DressUp() {
   // Wear log for today: is this exact outfit already logged?
   const today = todayISO();
   const todays = useLiveQuery(() => db.wear.where('date').equals(today).toArray(), [today]);
-  const wornEntry = useMemo(() => {
-    if (!todays || !draftIds.length) return undefined;
-    const want = [...draftIds].sort().join(',');
-    return todays.find((w) => [...w.itemIds].sort().join(',') === want);
-  }, [todays, draftIds]);
+  const wornEntry = useMemo(() => (todays && draftIds.length ? todays.find((w) => sameItems(w.itemIds, draftIds)) : undefined), [todays, draftIds]);
 
-  const update = useCallback((next: OutfitDraft) => { void setDraft(next); }, []);
+  /** Every draft change: written from the stored draft (quick taps never lose one), failures shown (bug-audit #3, #23). */
+  const edit = useCallback((change: (d: OutfitDraft) => OutfitDraft) => {
+    void attempt('dressup.draft', () => editDraft(change), t('state.saveFailed'));
+  }, [t]);
 
-  // ----- Layout: mannequin size from the space above the clothes row, and the slot column beside it.
+  // ----- Layout: the bottom panel's height, then the mannequin from the space above it, and the slot column beside it.
+  const [panelH, setPanelH] = useState(142);
+  const panelRO = useRef<ResizeObserver | null>(null);
+  const panelRef = useCallback((el: HTMLElement | null) => {
+    panelRO.current?.disconnect();
+    if (!el) return;
+    const ro = new ResizeObserver(() => setPanelH(el.offsetHeight));
+    ro.observe(el);
+    panelRO.current = ro;
+    setPanelH(el.offsetHeight);
+  }, []);
+  // The app's toasts are drawn outside this screen; they read this to sit above the panel (bug-audit #44).
+  useEffect(() => {
+    document.body.style.setProperty('--du-panel', `${panelH}px`);
+    return () => { document.body.style.removeProperty('--du-panel'); };
+  }, [panelH]);
+
   const [stageH, setStageH] = useState(0);
   const roRef = useRef<ResizeObserver | null>(null);
   const stageRef = useCallback((el: HTMLDivElement | null) => {
@@ -74,7 +103,8 @@ export default function DressUp() {
     roRef.current = ro;
     setStageH(el.clientHeight);
   }, []);
-  const mh = Math.round(Math.max(300, Math.min(stageH + 6, 2 * (vp.w - 170), 520)));
+  // No floor: on a small phone with a row open, a floor pushed the feet under the row (bug-audit #27, D31).
+  const mh = Math.round(Math.max(120, Math.min(stageH - 8, 2 * (vp.w - 170), 520)));
   const mLeft = 4;
   const mTop = 2;
   const colLeft = mLeft + mh / 2 + 12;
@@ -86,25 +116,46 @@ export default function DressUp() {
 
   const top = draft.slots.outer ?? draft.slots.mid ?? draft.slots.base ?? draft.slots.full;
   const layersOn = [draft.slots.base ?? draft.slots.full, draft.slots.mid, draft.slots.outer];
-  const slots = useMemo(() => {
-    if (!points) return [];
-    const order: DressupSlot[] = ['head', 'neck', 'top', 'hands', 'legs', 'feet'];
+  const { tier, slots } = useMemo(() => {
+    if (!points) return { tier: TIERS[0], slots: [] };
+    // The column lives between the header (the stage's top) and the bottom panel's torn edge (bug-audit #27).
+    const avail = stageH - 12;
+    const total = (ids: DressupSlot[], tr: typeof TIERS[number]) => ids.reduce((s, id) => s + (id === 'top' ? tr.top : tr.slot), 0) + (ids.length - 1) * tr.gap;
+    const tr = TIERS.find((x) => total(ORDER, x) <= avail) ?? TIERS[TIERS.length - 1];
+    let ids = ORDER;
+    if (open && total(ids, tr) > avail) {
+      // A short screen with a row open: the open slot and as many neighbours as fit; closing the row shows them all.
+      const at = ORDER.indexOf(open === 'acc' ? 'top' : open);
+      let lo = at;
+      let hi = at;
+      for (;;) {
+        const up = lo > 0 && total(ORDER.slice(lo - 1, hi + 1), tr) <= avail;
+        const down = hi < ORDER.length - 1 && total(ORDER.slice(lo, hi + 2), tr) <= avail;
+        if (!up && !down) break;
+        if (down && (!up || hi - at <= at - lo)) hi++;
+        else lo--;
+      }
+      ids = ORDER.slice(lo, hi + 1);
+    }
     let y = -Infinity;
-    const placed = order.map((id) => {
-      const h = id === 'top' ? TOP_H : SLOT_H;
+    const placed = ids.map((id) => {
+      const h = id === 'top' ? tr.top : tr.slot;
       const target = toCss(points[id]);
-      const want = Math.max(target.y - h / 2, y + GAP);
+      const want = Math.max(0, target.y - h / 2, y + tr.gap);
       y = want + h;
       return { id, h, top: want, target };
     });
-    // Keep the column inside the stage: shift up from the bottom if it overflows.
-    let limit = mTop + mh - 10;
+    // Keep the column above the panel: shift up from the bottom, then never above the header.
+    let limit = avail;
     for (let i = placed.length - 1; i >= 0; i--) {
       if (placed[i].top + placed[i].h > limit) placed[i].top = limit - placed[i].h;
-      limit = placed[i].top - GAP;
+      limit = placed[i].top - tr.gap;
     }
-    return placed;
-  }, [points, mh]);
+    y = 0;
+    for (const p of placed) { p.top = Math.max(p.top, y); y = p.top + p.h + tr.gap; }
+    return { tier: tr, slots: placed };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, mh, stageH, open]);
 
   const openSlot = (id: Open) => {
     if (open === id) { setOpen(null); return; }
@@ -123,74 +174,86 @@ export default function DressUp() {
       .sort((a, b) => (b.lastWornAt ?? 0) - (a.lastWornAt ?? 0) || a.name.localeCompare(b.name));
   }, [editSlot, items]);
   const wearCard = (item: Item) => {
-    if (isWorn(draft, item.id)) { update(takeOff(draft, item.id)); return; }
-    if (editSlot && editSlot !== 'acc' && CATEGORY[item.category].slot !== 'full' && CATEGORY[item.category].slot !== editSlot) return;
-    update(putOn(draft, item));
+    const slot = editSlot;
+    edit((d) => {
+      if (isWorn(d, item.id)) return takeOff(d, item.id);
+      if (slot && slot !== 'acc' && CATEGORY[item.category].slot !== 'full' && CATEGORY[item.category].slot !== slot) return d;
+      return putOn(d, item);
+    });
   };
   const clearSlot = () => {
-    if (!editSlot) return;
-    if (editSlot === 'acc') { update({ ...draft, outfitId: undefined, accessories: [] }); return; }
-    let next = placeItem(draft.slots, editSlot, undefined);
-    if (editSlot === 'base' || editSlot === 'legs') next = placeItem(next, 'full', undefined);
-    update({ ...draft, outfitId: undefined, slots: next });
+    const slot = editSlot;
+    if (!slot) return;
+    edit((d) => {
+      if (slot === 'acc') return { ...d, outfitId: undefined, accessories: [] };
+      let next = placeItem(d.slots, slot, undefined);
+      if (slot === 'base' || slot === 'legs') next = placeItem(next, 'full', undefined);
+      return { ...d, outfitId: undefined, slots: next };
+    });
   };
   const wornInRow = editSlot === 'acc' ? undefined : editSlot ? (draft.slots[editSlot] ?? ((editSlot === 'base' || editSlot === 'legs') ? draft.slots.full : undefined)) : undefined;
+  const flip = (k: 'tuckIn' | 'intoBoots') => edit((d) => ({ ...d, outfitId: undefined, toggles: { ...d.toggles, [k]: !d.toggles[k] } }));
   const toggle = open === 'top' && layer === 'base'
-    ? { label: t('dressup.tuckIn'), on: draft.toggles.tuckIn, flip: () => update({ ...draft, outfitId: undefined, toggles: { ...draft.toggles, tuckIn: !draft.toggles.tuckIn } }) }
+    ? { label: t('dressup.tuckIn'), on: draft.toggles.tuckIn, flip: () => flip('tuckIn') }
     : open === 'legs' || open === 'feet'
-      ? { label: t('dressup.intoBoots'), on: draft.toggles.intoBoots, flip: () => update({ ...draft, outfitId: undefined, toggles: { ...draft.toggles, intoBoots: !draft.toggles.intoBoots } }) }
+      ? { label: t('dressup.intoBoots'), on: draft.toggles.intoBoots, flip: () => flip('intoBoots') }
       : null;
   const rowTitle = open === 'acc' ? t('zone.acc') : open ? t(LABEL[open]) : '';
 
-  // ----- Actions.
+  // ----- Actions. One at a time (no double saves, bug-audit #23); failures are shown with Retry (#3).
   const empty = draftIds.length === 0;
-  const saveOutfit = async (name: string) => {
+  const opts = { errorText: t('state.saveFailed'), retryLabel: t('action.retry') };
+  const saveOutfit = useAction('dressup.saveOutfit', async (name: string) => {
     const now = Date.now();
     const id = newId();
-    await db.outfits.add({ id, name: name.trim() || t('dressup.newCombination'), slots: { ...draft.slots }, accessories: [...draft.accessories], toggles: { ...draft.toggles }, createdAt: now, updatedAt: now });
-    await setDraft({ ...draft, outfitId: id });
+    await db.transaction('rw', db.outfits, db.settings, async () => {
+      await db.outfits.add({ id, name: name.trim() || t('dressup.newCombination'), slots: { ...draft.slots }, accessories: [...draft.accessories], toggles: { ...draft.toggles }, createdAt: now, updatedAt: now });
+      await editDraft((d) => ({ ...d, outfitId: id }));
+    });
     setSaving(false);
     setToast({ text: t('dressup.outfitSaved') });
-  };
-  const wearToday = async () => {
-    if (empty) { setToast({ text: t('dressup.nothingOn') }); return; }
-    if (wornEntry) { await undoWear(wornEntry.id, wornItems ?? []); return; }
-    const before = (wornItems ?? []).map((i) => ({ id: i.id, lastWornAt: i.lastWornAt }));
-    const id = newId();
-    const now = Date.now();
-    await db.transaction('rw', db.wear, db.items, async () => {
-      await db.wear.add({ id, date: today, outfitId: matched?.id, itemIds: draftIds, createdAt: now });
-      for (const it of draftIds) await db.items.update(it, { lastWornAt: now });
+  }, opts);
+  const wear = useAction('dressup.wearToday', async (intent: 'log' | 'unlog') => {
+    if (intent === 'unlog') {
+      // "✓ Worn today" takes today's entry back, with Undo (bug-audit #21).
+      const entry = wornEntry;
+      if (!entry) return;
+      await deleteWear(entry.id);
+      setFreshStamp(false);
+      setToast({ text: t('dressup.unlogged'), undo: () => void attempt('dressup.undoUnlog', () => logWear(entry.date, entry.itemIds, entry.outfitId), t('state.saveFailed')) });
+      return;
+    }
+    const ids = draftIds;
+    // Logged once, even when a second tap arrives before the screen shows the first.
+    const id = await db.transaction('rw', db.wear, db.items, async () => {
+      const dup = await db.wear.where('date').equals(today).filter((w) => sameItems(w.itemIds, ids)).count();
+      return dup ? undefined : logWear(today, ids, matched?.id);
     });
+    if (!id) return;
     setFreshStamp(true);
-    setToast({
-      text: t('dressup.logged'),
-      undo: () => {
-        void db.transaction('rw', db.wear, db.items, async () => {
-          await db.wear.delete(id);
-          for (const b of before) await db.items.update(b.id, { lastWornAt: b.lastWornAt });
-        });
-      },
-    });
-  };
-  const undoWear = async (entryId: string, worn: Item[]) => {
-    await db.transaction('rw', db.wear, db.items, async () => {
-      await db.wear.delete(entryId);
-      // Fall back to the latest earlier wear of each item, if any.
-      for (const it of worn) {
-        const prev = await db.wear.filter((w) => w.itemIds.includes(it.id)).toArray();
-        const last = prev.map((w) => w.createdAt).sort((a, b) => b - a)[0];
-        await db.items.update(it.id, { lastWornAt: last });
-      }
-    });
-    setFreshStamp(false);
+    setToast({ text: t('dressup.logged'), undo: () => void attempt('dressup.undoWear', () => deleteWear(id), t('state.actionFailed')) });
+  }, opts);
+  const lastWearTap = useRef(0);
+  const onWear = () => {
+    if (empty) { setToast({ text: t('dressup.nothingOn') }); return; }
+    // A double tap on the toggle would log the outfit and take it back at once.
+    const now = Date.now();
+    if (now - lastWearTap.current < 400) return;
+    lastWearTap.current = now;
+    void wear.run(wornEntry ? 'unlog' : 'log');
   };
 
   useEffect(() => { if (!wornEntry) setFreshStamp(false); }, [wornEntry]);
 
+  const hideBodyCard = () => {
+    setCardHidden(true);
+    try { localStorage.setItem(BODY_CARD_HIDDEN, '1'); } catch { /* shown again next time */ }
+  };
+
   if (!settings) return null;
   const noClothes = items !== undefined && items.length === 0;
   const selectedItemId = wornInRow;
+  const showBodyCard = bodies === 0 && !cardHidden;
 
   return (
     <div className="du">
@@ -201,7 +264,7 @@ export default function DressUp() {
         </div>
       </div>
 
-      <div className="du__stage" ref={stageRef}>
+      <div className="du__stage" ref={stageRef} style={{ marginBottom: panelH }}>
         {stageH > 0 && (
           <>
             <div className="du__mannequin" style={{ left: mLeft, top: mTop }}>
@@ -226,23 +289,26 @@ export default function DressUp() {
                 if (s.id === 'top') {
                   const n = layersOn.filter(Boolean).length;
                   const it = itemOf(top);
+                  const compact = tier.top <= TIERS[3].top;
                   return (
-                    <button key={s.id} type="button" className={`du-slot du-slot--top${on ? ' is-on' : ''}`} aria-expanded={on}
+                    <button key={s.id} type="button" className={`du-slot du-slot--top${on ? ' is-on' : ''}${tier.top < TIERS[0].top ? ' is-tight' : ''}`} aria-expanded={on}
                       style={{ left: colLeft, top: s.top, width: colW, height: s.h }} onClick={() => openSlot('top')}>
                       <span className="du-slot__text">
                         <span className="du-slot__label">{t('dressup.topLayers', { n })}</span>
                         <span className="du-slot__name">{it ? it.name : t(ADD.top)}</span>
                       </span>
-                      <span className="du-slot__layers">
-                        {(['base', 'mid', 'outer'] as const).map((l, i) => {
-                          const li = itemOf(layersOn[i]);
-                          return (
-                            <span key={l} className={`du-slot__layer${li ? '' : ' is-empty'}`} title={li ? li.name : t('dressup.layerEmpty', { layer: t(`layer.${l}`) })}>
-                              {li ? <GarmentThumb item={li} photos={photos} w={32} h={26} /> : <Icon name="plus" size={14} strokeWidth={2} />}
-                            </span>
-                          );
-                        })}
-                      </span>
+                      {!compact && (
+                        <span className="du-slot__layers">
+                          {(['base', 'mid', 'outer'] as const).map((l, i) => {
+                            const li = itemOf(layersOn[i]);
+                            return (
+                              <span key={l} className={`du-slot__layer${li ? '' : ' is-empty'}`} title={li ? li.name : t('dressup.layerEmpty', { layer: t(`layer.${l}`) })}>
+                                {li ? <GarmentThumb item={li} photos={photos} w={32} h={26} /> : <Icon name="plus" size={14} strokeWidth={2} />}
+                              </span>
+                            );
+                          })}
+                        </span>
+                      )}
                     </button>
                   );
                 }
@@ -265,7 +331,7 @@ export default function DressUp() {
             <button type="button" className={`du__extras${open === 'acc' ? ' is-on' : ''}`} aria-expanded={open === 'acc'}
               style={{ top: mTop + mh * 0.67 }} onClick={() => openSlot('acc')}>
               <span className="du__extras-icon"><Icon name="bag" size={21} /></span>
-              {t('zone.acc')}
+              <span className="du__extras-label">{t('zone.acc')}</span>
               {draft.accessories.length > 0 && <span className="du__extras-count">{draft.accessories.length}</span>}
             </button>
           </>
@@ -273,11 +339,11 @@ export default function DressUp() {
       </div>
 
       {wornEntry && !open && (
-        <span className="du__stamp"><Stamp animate={freshStamp}>{t('dressup.wornStamp')}</Stamp></span>
+        <span className="du__stamp" style={{ bottom: `calc(var(--tabbar-h) + ${panelH + 18}px)` }}><Stamp animate={freshStamp}>{t('dressup.wornStamp')}</Stamp></span>
       )}
 
       {!open && (
-        <section className="du__sheet paper-edge" aria-label={t('dressup.thisOutfit')}>
+        <section className="du__sheet paper-edge" aria-label={t('dressup.thisOutfit')} ref={panelRef}>
           {noClothes ? (
             <div className="du__empty">
               <p className="body">{t('dressup.emptyWardrobe')}</p>
@@ -288,11 +354,25 @@ export default function DressUp() {
           ) : (
             <>
               <div className="du__sheet-top">
-                <span className="tag du__tag">{matched ? matched.name : t('dressup.newCombination')}</span>
-                {weather ? (
-                  <span className="du__weather"><Icon name="weather" size={18} strokeWidth={1.7} />{t('dressup.weather', { t: weather.tempC, summary: weather.summary })}</span>
+                {showBodyCard ? (
+                  // A body photo skipped at onboarding: the way back to it (bug-audit #14).
+                  <div className="du__body-card">
+                    <a className="du__body-link" href="#/body" onClick={(e) => { e.preventDefault(); navigate('/body'); }}>
+                      <Icon name="camera" size={18} />{t('dressup.bodyCard')}<Icon name="chevron" size={16} />
+                    </a>
+                    <button type="button" className="du__body-hide" aria-label={t('dressup.bodyCard.hide')} onClick={hideBodyCard}>
+                      <Icon name="close" size={16} strokeWidth={2} />
+                    </button>
+                  </div>
                 ) : (
-                  <span className="meta">{matched ? t('dressup.savedState') : t('dressup.notSaved')}</span>
+                  <>
+                    <span className="tag du__tag">{matched ? matched.name : t('dressup.newCombination')}</span>
+                    {weather ? (
+                      <span className="du__weather"><Icon name="weather" size={18} strokeWidth={1.7} />{t('dressup.weather', { t: weather.tempC, summary: weather.summary })}</span>
+                    ) : (
+                      <span className="meta">{matched ? t('dressup.savedState') : t('dressup.notSaved')}</span>
+                    )}
+                  </>
                 )}
               </div>
               <div className="du__actions">
@@ -300,7 +380,7 @@ export default function DressUp() {
                   onClick={() => { if (empty) setToast({ text: t('dressup.nothingOn') }); else if (!matched) setSaving(true); }}>
                   <Icon name={matched ? 'check' : 'outfits'} size={20} />{matched ? t('dressup.saved') : t('dressup.saveOutfit')}
                 </button>
-                <button type="button" className="btn btn--secondary du__wear" aria-pressed={!!wornEntry} onClick={() => void wearToday()}>
+                <button type="button" className="btn btn--secondary du__wear" aria-pressed={!!wornEntry} aria-busy={wear.busy} onClick={onWear}>
                   {wornEntry && <Icon name="check" size={18} strokeWidth={2.2} />}
                   {wornEntry ? t('dressup.wornToday') : t('dressup.wearingToday')}
                 </button>
@@ -314,7 +394,7 @@ export default function DressUp() {
       )}
 
       {open && (
-        <section className="du__row paper-edge" aria-label={rowTitle}>
+        <section className="du__row paper-edge" aria-label={rowTitle} ref={panelRef}>
           <div className="du__row-head">
             <h2 className="h2">{rowTitle}</h2>
             <div className="du__row-actions">
@@ -366,9 +446,9 @@ export default function DressUp() {
         </section>
       )}
 
-      {saving && <SaveSheet draft={draft} items={wornItems ?? []} onCancel={() => setSaving(false)} onSave={(n) => void saveOutfit(n)} />}
+      {saving && <SaveSheet draft={draft} items={wornItems ?? []} busy={saveOutfit.busy} onCancel={() => setSaving(false)} onSave={(n) => void saveOutfit.run(n)} />}
       {toast && (
-        <Toast onDone={() => setToast(null)} action={toast.undo ? (
+        <Toast onDone={() => setToast(null)} ms={toast.undo ? 6000 : undefined} action={toast.undo ? (
           <button type="button" className="text-action" onClick={() => { toast.undo?.(); setToast(null); }}>{t('dressup.undo')}</button>
         ) : undefined}>{toast.text}</Toast>
       )}
@@ -376,15 +456,15 @@ export default function DressUp() {
   );
 }
 
-function SaveSheet({ draft, items, onCancel, onSave }: { draft: OutfitDraft; items: Item[]; onCancel: () => void; onSave: (name: string) => void }) {
+function SaveSheet({ draft, items, busy, onCancel, onSave }: { draft: OutfitDraft; items: Item[]; busy: boolean; onCancel: () => void; onSave: (name: string) => void }) {
   const { t } = useI18n();
   const byId = new Map(items.map((i) => [i.id, i]));
-  const top = draft.slots.full ?? draft.slots.outer ?? draft.slots.mid ?? draft.slots.base;
-  const suggestion = [top, draft.slots.full ? undefined : draft.slots.legs].map((id) => (id ? byId.get(id)?.name : undefined)).filter(Boolean).join(' + ');
-  const [name, setName] = useState(suggestion);
+  // Named after the top piece only (or what's there), so suggested names stay short (bug-audit #40).
+  const first = [draft.slots.full, draft.slots.outer, draft.slots.mid, draft.slots.base, draft.slots.legs, draft.slots.feet].find((id) => id && byId.has(id));
+  const [name, setName] = useState(first ? byId.get(first)!.name : '');
   return (
     <Sheet onClose={onCancel} label={t('dressup.saveTitle')}>
-      <form className="du__save-sheet" onSubmit={(e) => { e.preventDefault(); onSave(name); }}>
+      <form className="du__save-sheet" onSubmit={(e) => { e.preventDefault(); if (!busy) onSave(name); }}>
         <h2 className="h2">{t('dressup.saveTitle')}</h2>
         <label className="field">
           <span className="field__label">{t('dressup.outfitName')}</span>
@@ -392,7 +472,7 @@ function SaveSheet({ draft, items, onCancel, onSave }: { draft: OutfitDraft; ite
         </label>
         <div className="row gap-12">
           <button type="button" className="btn btn--secondary grow" onClick={onCancel}>{t('action.cancel')}</button>
-          <button type="submit" className="btn btn--primary grow">{t('action.save')}</button>
+          <button type="submit" className="btn btn--primary grow" disabled={busy} aria-busy={busy}>{t('action.save')}</button>
         </div>
       </form>
     </Sheet>

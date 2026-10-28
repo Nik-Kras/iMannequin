@@ -1,14 +1,18 @@
 // Helpers shared by the try-on screens (Dress-up, See all, Adjust fit).
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../data/db';
+import { db, getSettings } from '../data/db';
 import { CATEGORY, placeItem } from '../domain/taxonomy';
 import type { Item, Outfit, OutfitDraft, Photo, Slot } from '../domain/types';
 import { CutoutImg } from '../ui/parts';
 
-/** Photos (by id) for a list of items, for thumbnails. */
+/**
+ * Photos (by id) for a list of items, for thumbnails. Keyed on the set of photo ids, so a list that only changes order
+ * or repeats an item (Dress-up's row plus what's worn) doesn't read every photo again: new Blobs make every card copy
+ * its image (bug-audit #11).
+ */
 export function useItemPhotos(items: Item[] | undefined): Record<string, Photo> | undefined {
-  const ids = (items ?? []).map((i) => i.tryOnPhotoId).filter((x): x is string => !!x);
+  const ids = [...new Set((items ?? []).map((i) => i.tryOnPhotoId).filter((x): x is string => !!x))].sort();
   const key = ids.join(',');
   return useLiveQuery(async () => {
     const photos = await db.photos.bulkGet(ids);
@@ -18,10 +22,10 @@ export function useItemPhotos(items: Item[] | undefined): Record<string, Photo> 
   }, [key]);
 }
 
-/** A garment's cut-out thumbnail, scaled to fit a box. */
+/** A garment's thumbnail (the small one; the full cut-out only when there's none), scaled to fit a box. */
 export function GarmentThumb({ item, photos, w, h, className }: { item?: Item; photos?: Record<string, Photo>; w: number; h: number; className?: string }) {
   const p = item?.tryOnPhotoId ? photos?.[item.tryOnPhotoId] : undefined;
-  const blob = p?.cutout ?? p?.thumb;
+  const blob = p?.thumb ?? p?.cutout;
   if (!item || !blob) return <span className={className} style={{ display: 'block', width: w, height: h }} />;
   return <CutoutImg blob={blob} alt="" style={{ width: w, height: h, objectFit: 'contain' }} />;
 }
@@ -42,6 +46,17 @@ export function putOn(draft: OutfitDraft, item: Item): OutfitDraft {
 export function takeOff(draft: OutfitDraft, itemId: string): OutfitDraft {
   const slots = Object.fromEntries(Object.entries(draft.slots).filter(([, v]) => v !== itemId)) as OutfitDraft['slots'];
   return { ...draft, outfitId: undefined, slots, accessories: draft.accessories.filter((a) => a !== itemId) };
+}
+
+/**
+ * Changes the stored Dress-up draft in one transaction, from the stored value: two quick taps both land instead of the
+ * second overwriting the first with a stale copy (bug-audit #23).
+ */
+export async function editDraft(change: (draft: OutfitDraft) => OutfitDraft): Promise<void> {
+  await db.transaction('rw', db.settings, async () => {
+    const s = await getSettings();
+    await db.settings.put({ ...s, draft: change(s.draft), id: 'app' });
+  });
 }
 
 export function isWorn(draft: OutfitDraft, itemId: string): boolean {

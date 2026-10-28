@@ -201,6 +201,6 @@ test('#3 Skip on the body photo reports a failed write instead of failing silent
   await openApp(page, { onboarded: false, route: '/body?onboarding=1' });
   await failWrites(page, 'settings', 'put');
   await page.getByRole('button', { name: 'Skip for now' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Couldn’t save' })).toBeVisible();
+  await expect(page.locator('.toast', { hasText: 'Couldn’t save' })).toBeVisible();
   await expect(page).toHaveURL(/#\/body/);
 });

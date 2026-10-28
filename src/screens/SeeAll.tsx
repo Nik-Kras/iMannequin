@@ -2,11 +2,12 @@
 // The one on the mannequin is circled; "Put it on" / "Take it off" changes the outfit and goes back to Dress-up.
 import { useMemo, useState } from 'react';
 import { goBack } from '../app/router';
-import { setDraft, useActiveItems, useLocations, useSettings } from '../data/repo';
+import { useActiveItems, useLocations, useSettings } from '../data/repo';
 import { categoriesForSlot } from '../domain/taxonomy';
 import { SEASONS, type ColourName, type OutfitDraft, type Season, type Slot } from '../domain/types';
 import { useI18n, type Key } from '../i18n';
-import { currentSeason, GarmentThumb, isWorn, putOn, takeOff, useItemPhotos } from '../tryon/ui';
+import { currentSeason, editDraft, GarmentThumb, isWorn, putOn, takeOff, useItemPhotos } from '../tryon/ui';
+import { useAction } from '../ui/action';
 import { Icon } from '../ui/icons';
 import { Chip, Empty, Header, PenCircle, Sheet } from '../ui/parts';
 import '../styles/dressup.css';
@@ -40,14 +41,18 @@ export default function SeeAll({ slot: param }: { slot?: string }) {
     return (items ?? []).filter((i) => cats.has(i.category))
       .sort((a, b) => (b.lastWornAt ?? 0) - (a.lastWornAt ?? 0) || a.name.localeCompare(b.name));
   }, [items, slot]);
-  const shown = inSlot.filter((i) => (!season || i.seasons.includes(season)) && (!colour || i.colours.includes(colour)) && (!place || i.locationId === place));
+  // A garment with no season set isn't hidden by the season filter (bug-audit #28).
+  const shown = inSlot.filter((i) => (!season || !i.seasons?.length || i.seasons.includes(season)) && (!colour || i.colours.includes(colour)) && (!place || i.locationId === place));
   const photos = useItemPhotos(inSlot);
   const placeName = (id?: string) => places?.find((p) => p.id === id)?.name;
   const worn = inSlot.find((i) => isWorn(draft, i.id));
   const current = inSlot.find((i) => i.id === (picked ?? worn?.id));
   const colours = useMemo(() => [...new Set(inSlot.flatMap((i) => i.colours))], [inSlot]);
 
-  const done = (next: OutfitDraft) => { void setDraft(next).then(() => goBack('/dressup')); };
+  const done = useAction('seeAll.done', async (change: (d: OutfitDraft) => OutfitDraft) => {
+    await editDraft(change);
+    goBack('/dressup');
+  }, { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
 
   const filterChip = (f: Filter, value: string | undefined, label: string, clear: () => void) => value ? (
     <button key={f} type="button" className="sa-filter" aria-pressed="true" aria-label={t('dressup.filter.remove', { name: `${t(`dressup.filter.${f}`)}: ${label}` })} onClick={clear}>
@@ -86,10 +91,11 @@ export default function SeeAll({ slot: param }: { slot?: string }) {
             return (
               <button key={it.id} type="button" className={`sa-card${isPicked ? ' is-picked' : ''}`} aria-pressed={isPicked}
                 style={{ transform: `rotate(${ROTS[i % ROTS.length]}deg)` }} onClick={() => setPicked(it.id)}>
-                <span className="sa-card__img"><GarmentThumb item={it} photos={photos} w={88} h={70} /></span>
+                {/* The pen circle rings the garment, not the whole card, so it never crosses the place name. */}
+                <span className="sa-card__img"><GarmentThumb item={it} photos={photos} w={88} h={70} />{on && <PenCircle />}</span>
                 <span className="sa-card__name">{it.name}</span>
                 {placeName(it.locationId) && <span className="sa-card__place">{placeName(it.locationId)}</span>}
-                {on && <><PenCircle /><span className="sr-only">{t('dressup.onYouNow')}</span></>}
+                {on && <span className="sr-only">{t('dressup.onYouNow')}</span>}
               </button>
             );
           })}
@@ -108,8 +114,8 @@ export default function SeeAll({ slot: param }: { slot?: string }) {
             </span>
           </div>
           {isWorn(draft, current.id)
-            ? <button type="button" className="btn btn--secondary" onClick={() => done(takeOff(draft, current.id))}>{t('dressup.takeOff')}</button>
-            : <button type="button" className="btn btn--primary" onClick={() => done(putOn(draft, current))}>{t('dressup.putOn')}</button>}
+            ? <button type="button" className="btn btn--secondary" disabled={done.busy} onClick={() => void done.run((d) => takeOff(d, current.id))}>{t('dressup.takeOff')}</button>
+            : <button type="button" className="btn btn--primary" disabled={done.busy} onClick={() => void done.run((d) => putOn(d, current))}>{t('dressup.putOn')}</button>}
         </section>
       )}
 

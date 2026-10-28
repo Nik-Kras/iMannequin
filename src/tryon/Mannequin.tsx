@@ -88,7 +88,6 @@ export function MannequinStage({ draft, height, mode, onTapZone, selectedItemId,
   }, [body, data, draft, fitOverride, drawMode, selectedItemId, height, width, scale, padCss, dpr]);
 
   const zones = useMemo(() => (body && onTapZone ? zoneRects(body) : []), [body, onTapZone]);
-  const seen = new Set<string>();
 
   return (
     <div className={`mannequin${className ? ` ${className}` : ''}`} style={{ position: 'relative', width, height }}>
@@ -97,22 +96,20 @@ export function MannequinStage({ draft, height, mode, onTapZone, selectedItemId,
         aria-hidden="true"
         style={{ position: 'absolute', left: -padCss, top: -padCss, width: width + 2 * padCss, height: height + 2 * padCss, pointerEvents: 'none' }}
       />
-      {zones.map((z, i) => {
-        const dup = seen.has(z.zone);
-        seen.add(z.zone);
-        return (
-          <button
-            key={i}
-            type="button"
-            className="mannequin__zone"
-            aria-label={t(ZONE_LABEL[z.zone])}
-            aria-hidden={dup || undefined}
-            tabIndex={dup ? -1 : undefined}
-            onClick={() => onTapZone?.(z.zone)}
-            style={{ position: 'absolute', left: z.x * scale, top: z.y * scale, width: z.w * scale, height: z.h * scale, background: 'transparent', border: 0, padding: 0, borderRadius: 6 }}
-          />
-        );
-      })}
+      {/* A tap on the body opens its slot. Out of VoiceOver's and the keyboard's way: Dress-up's slot column is the
+          accessible path, and these zones are as small as 29 × 15 px (bug-audit #28). */}
+      {zones.map((z, i) => (
+        <button
+          key={i}
+          type="button"
+          className="mannequin__zone"
+          aria-label={t(ZONE_LABEL[z.zone])}
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={() => onTapZone?.(z.zone)}
+          style={{ position: 'absolute', left: z.x * scale, top: z.y * scale, width: z.w * scale, height: z.h * scale, background: 'transparent', border: 0, padding: 0, borderRadius: 6 }}
+        />
+      ))}
       {children}
     </div>
   );

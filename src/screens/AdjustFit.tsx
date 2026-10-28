@@ -2,15 +2,18 @@
 // The correction is saved on the item in reference lengths, so it applies in every outfit and survives a new body
 // photo (try-on §5). Every drag has a button alternative (WCAG 2.2, 2.5.7).
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { goBack } from '../app/router';
-import { saveItem, useItem, useSettings } from '../data/repo';
+import { db } from '../data/db';
+import { useSettings } from '../data/repo';
 import { CATEGORY } from '../domain/taxonomy';
-import type { FitAdjustment, OutfitDraft } from '../domain/types';
+import type { FitAdjustment, Item, OutfitDraft } from '../domain/types';
 import { useI18n, type Key } from '../i18n';
 import { isNeutralFit, MannequinStage, NEUTRAL_FIT, offsetForHandle, type Handle, type StageLayout } from '../tryon';
 import { putOn, useViewport } from '../tryon/ui';
+import { attempt, useAction } from '../ui/action';
 import { Icon } from '../ui/icons';
-import { Header, Segmented } from '../ui/parts';
+import { Empty, Header, Segmented } from '../ui/parts';
 import '../styles/dressup.css';
 
 type Mode = 'points' | 'whole';
@@ -20,19 +23,33 @@ const SCALE_STEP = 1.03;
 const TURN_STEP = 2; // degrees
 
 const clone = (f: FitAdjustment): FitAdjustment => ({ ...f, points: f.points ? Object.fromEntries(Object.entries(f.points).map(([k, v]) => [k, { ...v }])) : undefined });
+/** Stores the correction on the item (only that field, so nothing else is overwritten). */
+const storeFit = (id: string, fit: FitAdjustment) => db.items.update(id, { fit: isNeutralFit(fit) ? undefined : fit, updatedAt: Date.now() });
 
 export default function AdjustFit({ itemId }: { itemId?: string }) {
   const { t } = useI18n();
-  const item = useItem(itemId);
+  // undefined while loading, null when there's no such item (bug-audit #25).
+  const item = useLiveQuery(async () => (itemId ? (await db.items.get(itemId)) ?? null : null), [itemId]);
   const settings = useSettings();
   const vp = useViewport();
   const [mode, setMode] = useState<Mode>('points');
-  const [fit, setFit] = useState<FitAdjustment>();
+  const [fit, setFitState] = useState<FitAdjustment>();
   const [layout, setLayout] = useState<StageLayout>();
   const [sel, setSel] = useState<string>();
   const [stageH, setStageH] = useState(0);
+  const touched = useRef(false);
+  const setFit = (f: FitAdjustment) => { touched.current = true; setFitState(f); };
 
-  useEffect(() => { if (item && !fit) setFit(clone(item.fit ?? NEUTRAL_FIT)); }, [item, fit]);
+  useEffect(() => { if (item && !fit) setFitState(clone(item.fit ?? NEUTRAL_FIT)); }, [item, fit]);
+
+  // Back and the edge swipe keep the drags, as the note says (bug-audit #21): what's changed is saved on the way out.
+  const latest = useRef<{ item?: Item | null; fit?: FitAdjustment }>({});
+  latest.current = { item, fit };
+  useEffect(() => () => {
+    const { item: it, fit: f } = latest.current;
+    if (touched.current && it && f) void attempt('fit.saveOnLeave', () => storeFit(it.id, f), t('state.saveFailed'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The outfit on the mannequin, with this garment on it.
   const draft = useMemo(() => {
@@ -49,7 +66,8 @@ export default function AdjustFit({ itemId }: { itemId?: string }) {
     ro.current.observe(el);
     setStageH(el.clientHeight);
   }, []);
-  const mh = Math.round(Math.max(280, Math.min(stageH - 16, 2 * (vp.w - 128), 560)));
+  // No floor: on an iPhone SE a 280 px floor put the hem handles under the panel (bug-audit #27).
+  const mh = Math.round(Math.max(160, Math.min(stageH - 16, 2 * (vp.w - 128), 560)));
   const mLeft = Math.round((vp.w - mh / 2) / 2);
   const scale = mh / 2000;
 
@@ -126,13 +144,24 @@ export default function AdjustFit({ itemId }: { itemId?: string }) {
     if (pointers.current.size === 0) drag.current = null;
   };
 
-  const save = async () => {
+  const done = useAction('fit.done', async () => {
     if (!item || !fit) return;
-    await saveItem({ ...item, fit: isNeutralFit(fit) ? undefined : fit });
+    await storeFit(item.id, fit);
+    touched.current = false;
     goBack('/dressup');
-  };
+  }, { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
 
   if (!itemId) return null;
+  if (item === null) {
+    return (
+      <div className="screen screen--no-tabs">
+        <Header back="/dressup" backLabel={t('tab.dressup')} />
+        <Empty icon="search" action={<button type="button" className="btn btn--secondary btn--sm" onClick={() => goBack('/dressup')}>{t('action.back')}</button>}>
+          {t('dressup.fit.notFound')}
+        </Empty>
+      </div>
+    );
+  }
   const what = item ? t(`cat.${item.category}`).toLowerCase() : '';
   const bbox = placement && layout ? bounds(handles) : undefined;
   // The label sits outside the handle, away from the body's middle so it never covers the head.
@@ -224,7 +253,7 @@ export default function AdjustFit({ itemId }: { itemId?: string }) {
           <button type="button" className="btn btn--secondary" onClick={() => setFit(clone(NEUTRAL_FIT))} disabled={!fit || isNeutralFit(fit)}>
             <Icon name="undo" size={18} />{t('dressup.fit.reset')}
           </button>
-          <button type="button" className="btn btn--primary" onClick={() => void save()}>{t('action.done')}</button>
+          <button type="button" className="btn btn--primary" disabled={done.busy} onClick={() => void done.run()}>{t('action.done')}</button>
         </div>
       </section>
     </div>
