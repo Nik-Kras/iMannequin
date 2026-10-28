@@ -286,6 +286,9 @@ textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: ver
   animation: sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .toast .text-action { color: var(--sheet); }
+/* Toasts are drawn in the shell's live region (bug-audit #44), outside the screen: a screen with a bottom bar lifts
+   its toast with this modifier (a selector scoped to the screen no longer reaches it). */
+.toast--above-bar { bottom: calc(var(--safe-bottom) + 112px); }
 
 /* Reduce Motion (bug-audit #41): every animation plays once, instantly; nothing loops or strobes. Progress still
    shows: the spinner breathes slowly instead of turning, and the body scan line stays still. */

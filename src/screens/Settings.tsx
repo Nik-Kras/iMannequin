@@ -93,8 +93,8 @@ export default function Settings() {
       setWx('denied');
       return;
     }
-    await updateSettings({ weather: { enabled: true, ...where } });
     setWx('idle');
+    await updateSettings({ weather: { enabled: true, ...where } });
   }, failed);
   const removeOriginal = useAction('settings.deleteOriginal', async () => {
     // D48: the original photo goes; the cut-out and mask stay, so the mannequin keeps working.

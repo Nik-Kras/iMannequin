@@ -139,7 +139,8 @@ test.describe('#33 trips', () => {
 test.describe('#34 #36 #14 settings and reminders', () => {
   test('#34 deleted default places stay deleted', async ({ page }) => {
     await openApp(page, { route: '/settings' });
-    await expect.poll(() => withDb(page, 'return db.locations.count()')).toBe(6);
+    // First launch made the six default places (openApp's own settings write can land in between: wait for the flag).
+    await expect.poll(() => withDb(page, `return [await db.locations.count(), (await db.settings.get('app')).placesSeeded]`)).toEqual([6, true]);
     await withDb(page, 'await db.locations.clear()');
     for (const r of ['/places', '/wardrobe', '/settings']) {
       await page.evaluate((r) => { location.hash = r; }, r);
