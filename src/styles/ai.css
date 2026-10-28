@@ -2,7 +2,7 @@
 
 /* ---------- Shared ---------- */
 .ai-steps { display: flex; gap: 6px; height: 24px; align-items: center; }
-.ai-steps span { width: 28px; height: 4px; border-radius: 2px; background: var(--pencil); }
+.ai-steps span { width: 28px; height: 4px; border-radius: 2px; background: var(--line); }
 .ai-steps span.on { background: var(--ink); }
 .ai-bar { height: 8px; border-radius: 4px; background: var(--pencil); overflow: hidden; }
 .ai-bar > span { display: block; height: 100%; background: var(--ink); border-radius: 4px; transition: width 300ms ease-out; }
