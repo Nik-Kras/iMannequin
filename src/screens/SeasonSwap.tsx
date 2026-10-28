@@ -102,7 +102,7 @@ export default function SeasonSwap() {
           <span className="wd-ellipsis">{!n ? t('wardrobe.swap.choose') : !destName ? t('wardrobe.swap.choosePlace') : tn('wardrobe.swap.move', n, { place: destName })}</span>
         </button>
       </section>
-      {toast && <Toast onDone={() => setToast(undefined)}>{toast}</Toast>}
+      {toast && <Toast className="toast--above-bar" onDone={() => setToast(undefined)}>{toast}</Toast>}
     </div>
   );
 }

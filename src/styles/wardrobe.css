@@ -376,4 +376,5 @@ a.wd-placerow:active { box-shadow: var(--shadow-lift); transform: scale(0.99); }
   clip-path: polygon(0 100%, 0 70%, 15% 25%, 31% 60%, 51% 30%, 69% 5%, 85% 45%, 100% 10%, 100% 100%);
 }
 .wd-movebar .btn:disabled { opacity: 1; background: var(--pencil); color: var(--graphite); box-shadow: none; }
-.wd-swap .toast { bottom: calc(var(--safe-bottom) + 112px); }
+/* App-wide messages (a failed save) clear the bottom bars of these screens too. */
+body:has(.wd-movebar) .toast, body:has(.wd-fix__actions) .toast, body:has(.wd-form__foot) .toast { bottom: calc(var(--safe-bottom) + 112px); }
