@@ -37,7 +37,7 @@ export interface GarmentAnalysis {
 export interface PoseResult {
   /** 33 MediaPipe points, x/y normalised 0–1 to the photo. */
   landmarks: Landmark[];
-  /** Person mask at photo size: alpha/intensity > 127 = body. */
+  /** Person mask at the model's resolution (scaled to the photo when drawn): alpha/intensity > 127 = body. */
   mask: ImageData;
   width: number;
   height: number;
