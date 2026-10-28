@@ -8,3 +8,6 @@ playwright-report
 .cache/
 # Never commit real photos (R2): keep personal test images here
 private/
+# copied from node_modules by scripts/copy-vendor.mjs
+public/vendor/
+*.tsbuildinfo

@@ -1,0 +1,271 @@
+/* iMannequin paper UI kit. Tokens come from docs/design.md; class names are the component vocabulary
+   every screen uses. Paper and ink only: the clothes are the only colour (D27). */
+@import '@fontsource/prata/400.css';
+@import '@fontsource/onest/400.css';
+@import '@fontsource/onest/500.css';
+@import '@fontsource/onest/600.css';
+@import '@fontsource/caveat/500.css';
+@import '@fontsource/caveat/600.css';
+@import '@fontsource/caveat/700.css';
+
+:root {
+  --ink: #141414;
+  --graphite: #55524c;
+  --carbon: #0d0d0d;
+  --on-carbon-2: #b9b4aa;
+  --paper: #eeece7;
+  --sheet: #ffffff;
+  --tissue: #f6f4ef;
+  --pencil: #cfcac1;
+  --rule: #e4e0d8;
+  --dash: #9e998f;
+  --marker: #b3261e;
+  --switch-off: #8f8a80;
+
+  --font-display: 'Prata', Georgia, serif;
+  --font-text: 'Onest', system-ui, -apple-system, sans-serif;
+  --font-hand: 'Caveat', 'Segoe Print', cursive;
+
+  --r-thumb: 4px;
+  --r-card: 6px;
+  --r-field: 10px;
+  --r-button: 14px;
+
+  --shadow-rest: 0 0 0 0.5px rgba(20, 20, 20, 0.07), 1px 2px 3px rgba(20, 20, 20, 0.14);
+  --shadow-lift: 0 0 0 0.5px rgba(20, 20, 20, 0.08), 2px 6px 12px rgba(20, 20, 20, 0.18);
+  --shadow-button: 1px 2px 4px rgba(20, 20, 20, 0.25);
+  --shadow-sheet: 0 -4px 16px rgba(20, 20, 20, 0.08);
+  --cutout-filter: drop-shadow(1.2px 0 0 #fff) drop-shadow(-1.2px 0 0 #fff) drop-shadow(0 1.2px 0 #fff) drop-shadow(0 -1.2px 0 #fff) drop-shadow(1px 2px 1.5px rgba(20, 20, 20, 0.24));
+
+  --gutter: 20px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tabbar-h: calc(64px + var(--safe-bottom));
+
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 16px/1.45 var(--font-text);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+::selection { background: var(--ink); color: var(--sheet); }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--ink); }
+img { display: block; max-width: 100%; }
+h1, h2, h3, p { margin: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Crumpled paper: a pre-rendered lighting map multiplied over the paper colour, fixed behind everything. */
+.paper-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: url('../assets/paper.webp') center / cover no-repeat;
+  mix-blend-mode: multiply; opacity: 0.55;
+}
+
+/* ---------- Layout ---------- */
+.app { position: relative; z-index: 1; min-height: 100%; }
+.screen {
+  position: relative; min-height: 100dvh;
+  padding: calc(var(--safe-top) + 14px) 0 calc(var(--tabbar-h) + 24px);
+}
+.screen--no-tabs { padding-bottom: calc(var(--safe-bottom) + 24px); }
+.pad { padding-inline: var(--gutter); }
+.stack { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; }
+.gap-4 { gap: 4px; } .gap-8 { gap: 8px; } .gap-12 { gap: 12px; } .gap-16 { gap: 16px; } .gap-24 { gap: 24px; }
+.grow { flex: 1; min-width: 0; }
+.hscroll { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-inline: 16px; }
+.hscroll::-webkit-scrollbar { display: none; }
+
+/* ---------- Type ---------- */
+.h1 { font: 400 30px/1.05 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; }
+.h2 { font: 400 21px/1.2 var(--font-display); }
+.title-card { font: 600 16px/1.3 var(--font-text); }
+.body { font: 400 16px/1.45 var(--font-text); }
+.row-text { font: 500 15px/1.35 var(--font-text); }
+.meta { font: 400 13px/1.35 var(--font-text); color: var(--graphite); }
+.hand { font: 600 20px/1.1 var(--font-hand); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Header ---------- */
+.header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding-inline: var(--gutter) 16px; }
+.header__actions { display: flex; gap: 10px; align-items: center; }
+.back {
+  display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 6px 0 0;
+  border: 0; background: none; font: 500 15px var(--font-text); text-decoration: none; color: var(--ink);
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 52px; padding: 0 22px; border-radius: var(--r-button);
+  font: 600 16px/1.2 var(--font-text); text-decoration: none; white-space: nowrap;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out, opacity 120ms;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled, .btn[aria-disabled='true'] { opacity: 0.4; cursor: default; }
+.btn--primary { border: 0; background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-button); }
+.btn--secondary { border: 1.5px solid var(--ink); background: var(--sheet); color: var(--ink); }
+.btn--danger { border: 1.5px solid var(--marker); background: var(--sheet); color: var(--marker); }
+.btn--block { width: 100%; }
+.btn--sm { height: 44px; padding: 0 16px; font-size: 15px; }
+.btn--square { width: 52px; padding: 0; flex: none; }
+.text-action {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px;
+  border: 0; background: none; font: 600 14px var(--font-text); color: var(--ink); text-decoration: none;
+}
+.icon-btn {
+  width: 44px; height: 44px; flex: none; border-radius: 50%; border: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--sheet); color: var(--ink); box-shadow: var(--shadow-rest); text-decoration: none;
+}
+.icon-btn--ink { background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-button); }
+.icon-btn--tissue { background: var(--tissue); box-shadow: none; }
+
+/* ---------- Chips, segmented, switch ---------- */
+.chip {
+  position: relative; flex: none; height: 36px; padding: 0 14px; border-radius: 999px;
+  border: 1.5px solid var(--ink); background: var(--sheet); color: var(--ink);
+  font: 500 14.5px var(--font-text); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.chip::after { content: ''; position: absolute; inset: -4px -2px; } /* 44px touch area */
+.chip[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
+.chip--soft { border-color: transparent; background: var(--tissue); }
+.chip--dashed { border-style: dashed; border-color: var(--dash); background: transparent; }
+.chip__ai { width: 12px; height: 12px; flex: none; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 20px; background: var(--tissue); }
+.seg--on-paper { background: var(--sheet); box-shadow: var(--shadow-rest); }
+.seg button {
+  height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: transparent;
+  font: 500 14px var(--font-text); color: var(--ink);
+}
+.seg button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
+.switch {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0;
+  border: 0; background: none; font: 500 15px var(--font-text); color: var(--ink);
+}
+.switch__track { position: relative; width: 44px; height: 26px; flex: none; border-radius: 13px; background: var(--switch-off); transition: background 150ms; }
+.switch__track::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--sheet); transition: transform 150ms ease-out;
+}
+.switch[aria-checked='true'] .switch__track { background: var(--ink); }
+.switch[aria-checked='true'] .switch__track::after { transform: translateX(18px); }
+
+/* ---------- Paper surfaces ---------- */
+.card { position: relative; background: var(--sheet); border-radius: var(--r-card); box-shadow: var(--shadow-rest); }
+.card--pad { padding: 16px; }
+.card--lift { box-shadow: var(--shadow-lift); }
+.card--selected { box-shadow: 0 0 0 2px var(--ink), var(--shadow-lift); }
+.inset { background: var(--tissue); border-radius: var(--r-thumb); }
+.list { display: flex; flex-direction: column; }
+.list-row {
+  display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 16px;
+  border: 0; background: none; width: 100%; text-align: left; text-decoration: none; color: var(--ink);
+  font: 500 15px var(--font-text);
+}
+.list-row + .list-row { border-top: 1px solid var(--rule); }
+.dashed-slot { border: 1.5px dashed var(--dash); border-radius: var(--r-card); background: transparent; color: var(--graphite); }
+
+/* Bottom sheet that slides up like a sheet of paper (design §2). */
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  background: var(--sheet); box-shadow: var(--shadow-sheet);
+  padding-bottom: calc(var(--safe-bottom) + 12px);
+  animation: sheet-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sheet::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 12px;
+  background: var(--sheet);
+  clip-path: polygon(0 100%, 0 70%, 15% 25%, 31% 60%, 51% 30%, 69% 5%, 85% 45%, 100% 10%, 100% 100%);
+}
+.scrim { position: fixed; inset: 0; z-index: 29; background: rgba(20, 20, 20, 0.28); animation: fade-in 200ms; }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fade-in { from { opacity: 0; } }
+
+/* ---------- Fields ---------- */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field__label { font: 500 14px var(--font-text); }
+.input {
+  height: 48px; width: 100%; padding: 0 14px; border: 0; border-radius: var(--r-field);
+  background: var(--tissue); font: 400 16px var(--font-text); color: var(--ink);
+}
+textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: vertical; }
+.input::placeholder { color: var(--graphite); }
+
+/* ---------- Paper devices ---------- */
+.tag {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 9px;
+  border: 1.5px solid var(--ink); border-radius: 3px 15px 15px 3px; background: var(--sheet);
+  font: 600 20px/1 var(--font-hand); color: var(--ink); white-space: nowrap;
+}
+.tag::before { content: ''; width: 7px; height: 7px; flex: none; border-radius: 50%; border: 1.5px solid currentColor; }
+.tag--ink { background: var(--ink); color: var(--sheet); }
+.stamp {
+  display: inline-flex; align-items: center; height: 38px; padding: 0 12px;
+  border: 2px solid var(--ink); border-radius: 6px; font: 700 22px/1 var(--font-hand);
+  opacity: 0.85; transform: rotate(-8deg);
+}
+.stamp--in { animation: stamp-in 220ms cubic-bezier(0.3, 1.5, 0.5, 1); }
+@keyframes stamp-in { from { transform: rotate(-8deg) scale(1.6); opacity: 0; } }
+
+/* A garment cut-out: white scissor margin and a soft paper shadow around the transparent PNG. */
+.cutout { object-fit: contain; filter: var(--cutout-filter); }
+
+/* ---------- Tab bar (D29): four tabs and a raised centre + ---------- */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  height: var(--tabbar-h); padding: 8px 4px var(--safe-bottom);
+  display: flex; justify-content: space-around; align-items: flex-start;
+  background: var(--sheet); box-shadow: 0 -2px 10px rgba(20, 20, 20, 0.05);
+}
+.tabbar::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -8px; height: 10px; background: var(--sheet);
+  clip-path: polygon(0 100%, 0 60%, 3% 20%, 7% 70%, 11% 30%, 15% 80%, 19% 25%, 23% 60%, 27% 15%, 31% 75%, 35% 35%, 39% 85%, 43% 20%, 47% 65%, 51% 30%, 55% 80%, 59% 15%, 63% 55%, 67% 25%, 71% 75%, 75% 35%, 79% 85%, 83% 20%, 87% 60%, 91% 30%, 95% 70%, 100% 25%, 100% 100%);
+}
+.tab {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px;
+  font: 500 12px var(--font-text); color: var(--graphite); text-decoration: none; border: 0; background: none; padding: 0;
+}
+.tab__icon { width: 52px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: var(--ink); }
+.tab[aria-current='page'] { color: var(--ink); font-weight: 600; }
+.tab[aria-current='page'] .tab__icon { background: var(--ink); color: var(--sheet); }
+.tab-add {
+  flex: none; width: 56px; height: 56px; margin-top: -13px; border-radius: 50%; border: 0;
+  background: var(--ink); color: var(--sheet); display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 5px var(--sheet), 1px 5px 12px rgba(20, 20, 20, 0.3);
+}
+.tab-add:active { transform: scale(0.96); }
+
+/* ---------- Banners and states ---------- */
+.banner {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-card);
+  background: var(--ink); color: var(--sheet); font: 500 15px var(--font-text); text-decoration: none; border: 0; width: 100%; text-align: left;
+}
+.empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px var(--gutter); text-align: center; color: var(--graphite); }
+.bar { height: 6px; border-radius: 3px; background: var(--tissue); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--ink); border-radius: 3px; transition: width 300ms ease-out; }
+.spinner { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--pencil); border-top-color: var(--ink); animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast {
+  position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + 16px); z-index: 50;
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-card);
+  background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-lift); font: 500 15px var(--font-text);
+  animation: sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.toast .text-action { color: var(--sheet); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}

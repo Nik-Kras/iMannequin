@@ -52,25 +52,26 @@ Rule: the owner approves every naming, design, feature and stack decision. Claud
 | D31 | 2026-10-28 | Dress-up layout: the mannequin on the left and **an always-visible column of slots** on the right (Hat, Scarf, Top with Base · Middle · Outer, Gloves, Bottoms, Shoes), each aligned with its body part and joined to it by a callout line. Extras is a side button (D17). Tapping a slot or the body opens the row of clothes **below the mannequin, never over it**. Refines D21 | A clothes rail with garments on hangers; a large mannequin you tap directly | Owner: clearer for choosing each piece, and every section is on the page without scrolling |
 | D32 | 2026-10-28 | Search by description: the language model candidates are **Qwen3-1.7B** (Apache-2.0, multilingual incl. Ukrainian; the default if the phone can hold it), **Qwen2.5-1.5B-Instruct** (Apache-2.0) and **Qwen3-0.6B** (Apache-2.0, the light fallback). The model **loads only when a search needs it**, one AI model in memory at a time, and plain keyword filters (seasons, colours, places, categories in both languages) run first. Calibration on the phone picks the default (D12). Resolves Q18 | Qwen2.5-0.5B (weak at Ukrainian); Qwen2.5-3B (not Apache); no language model | Owner agreed. Risk: iPhone Safari kills a tab at about 2 GB, and RHP's 2B model crashed there, so the 1.7B model must prove itself on the real phone |
 | D33 | 2026-10-28 | Ukrainian tab names: **Примірка · Гардероб · Образи · Поїздки** | n/a | Owner agreed |
+| D34 | 2026-10-28 | Swimwear and nightwear: **Swimwear in** (useful for packing lists), nightwear out. Resolves Q1 | both out · both in | Owner accepted the recommendation |
+| D35 | 2026-10-28 | Where does the weather hint get the location from: **Phone location rounded to ~10 km**, asked once. Resolves Q2 | a city typed once (only the name is sent) | Owner accepted the recommendation |
+| D36 | 2026-10-28 | Dark mode: **Light only** (white paper). Resolves Q4 | an inverted "black paper" mode · follow the phone | Owner accepted the recommendation |
+| D37 | 2026-10-28 | Privacy of shared outfit images when the mannequin is a real photo: **Share uses the outline by default**, with a switch to include the photo. Resolves Q6 | same as the screen · garments only (flat lay) | Owner accepted the recommendation |
+| D38 | 2026-10-28 | Does an item have a name: **Auto-filled name** ("Navy jeans") the user can edit. Resolves Q7 | no name, show category and colour | Owner accepted the recommendation |
+| D39 | 2026-10-28 | How are shoes photographed: **The pair from the front** at floor level, to match the front-facing mannequin. Resolves Q8 | from the side | Owner accepted the recommendation |
+| D40 | 2026-10-28 | Layer order toggles: A **"Tuck in"** toggle for tops and a **"Trousers into boots"** toggle; everything else uses a fixed order ([try-on §6](try-on.md#6-layering)). Resolves Q9 | n/a | Owner accepted the recommendation |
+| D41 | 2026-10-28 | A backup reminder: **Monthly** reminder banner. Resolves Q10 | none | Owner accepted the recommendation |
+| D42 | 2026-10-28 | "Not worn" threshold: **6 months** by default, editable in Settings. Resolves Q11 | n/a | Owner accepted the recommendation |
+| D43 | 2026-10-28 | Several photos per item? Same-item detection can add a new photo to an existing item: **Yes**: one photo is the "try-on" photo and the others are kept as a gallery. Resolves Q12 | one photo only | Owner accepted the recommendation |
+| D44 | 2026-10-28 | Seasons: **Spring · Summer · Autumn · Winter**, pick several. Resolves Q13 | warm / cold only | Owner accepted the recommendation |
+| D45 | 2026-10-28 | Packing list shape: A trip has a name and dates; you add outfits or single items; the checklist is **grouped by storage location** so packing is one walk round the flat. Resolves Q14 | n/a | Owner accepted the recommendation |
+| D46 | 2026-10-28 | Wear log input: **"Wearing today"** on Dress-up logs the current outfit, and items can be marked worn on their own. Resolves Q15 | n/a | Owner accepted the recommendation |
+| D47 | 2026-10-28 | Install guide: Like RHP: when the app is opened in a browser tab, it shows how to add it to the home screen (Safari: Share → Add to Home Screen; Chrome: Install). Resolves Q16 | n/a | Owner accepted the recommendation |
+| D48 | 2026-10-28 | Outline mode: keep the original body photo: **Keep it**, so switching back works, and offer **Delete original photo** in Settings. Resolves Q17 | delete it as soon as outline is chosen | Owner accepted the recommendation |
+| D49 | 2026-10-28 | Dress-up's clothes row shows **cards**. The hanger rail stays a canvas idea only | Hangers on a rail | Owner's choice |
 
 ## Open questions
 
-⭐ = recommended. Questions marked *design* are settled while designing the screens.
+None open (all resolved on 2026-10-28). New questions go here.
 
 | # | Pri | Question | Options (⭐ = recommended) |
 |---|---|---|---|
-| Q1 | Med | Swimwear and nightwear? | ⭐ **Swimwear in** (useful for packing lists), nightwear out · both out · both in |
-| Q2 | Med | Where does the weather hint get the location from? | ⭐ **Phone location rounded to ~10 km**, asked once · a city typed once (only the name is sent) |
-| Q4 | Med | *design*: dark mode? | ⭐ **Light only** (white paper) · an inverted "black paper" mode · follow the phone |
-| Q6 | High | Privacy of shared outfit images when the mannequin is a real photo | ⭐ **Share uses the outline by default**, with a switch to include the photo · same as the screen · garments only (flat lay) |
-| Q7 | Med | Does an item have a name? | ⭐ **Auto-filled name** ("Navy jeans") the user can edit · no name, show category and colour |
-| Q8 | Med | How are shoes photographed? | ⭐ **The pair from the front** at floor level, to match the front-facing mannequin · from the side |
-| Q9 | Med | Layer order toggles | ⭐ A **"Tuck in"** toggle for tops and a **"Trousers into boots"** toggle; everything else uses a fixed order ([try-on §6](try-on.md#6-layering)) |
-| Q10 | Med | A backup reminder? | ⭐ **Monthly** reminder banner · none |
-| Q11 | Low | "Not worn" threshold | ⭐ **6 months** by default, editable in Settings |
-| Q12 | Med | Several photos per item? Same-item detection can add a new photo to an existing item | ⭐ **Yes**: one photo is the "try-on" photo and the others are kept as a gallery · one photo only |
-| Q13 | Low | Seasons | ⭐ **Spring · Summer · Autumn · Winter**, pick several · warm / cold only |
-| Q14 | Med | Packing list shape | ⭐ A trip has a name and dates; you add outfits or single items; the checklist is **grouped by storage location** so packing is one walk round the flat |
-| Q15 | Med | Wear log input | ⭐ **"Wearing today"** on Dress-up logs the current outfit, and items can be marked worn on their own |
-| Q16 | Low | Install guide | ⭐ Like RHP: when the app is opened in a browser tab, it shows how to add it to the home screen (Safari: Share → Add to Home Screen; Chrome: Install) |
-| Q17 | Med | Outline mode: keep the original body photo? | ⭐ **Keep it**, so switching back works, and offer **Delete original photo** in Settings · delete it as soon as outline is chosen |
