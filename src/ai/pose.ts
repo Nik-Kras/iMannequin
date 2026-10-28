@@ -19,7 +19,25 @@ export class PoseError extends Error {
 /** Pose model file served from our own origin (R1). */
 export const poseModelUrl = (file: string) => `${import.meta.env.BASE_URL}${file}`;
 
+/**
+ * MediaPipe Tasks 1.2.0 starts a usage logger with every task. It posts to Google every minute and when the task
+ * closes, and has no switch. R1 allows no such request, so it is answered here without the network; the logger
+ * takes the failure as final and stops (bug-audit #52).
+ */
+const MEDIAPIPE_LOG = 'https://odml.pa.googleapis.com/';
+let logBlocked = false;
+function blockMediapipeLogging() {
+  if (logBlocked) return;
+  logBlocked = true;
+  const real = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    return url.startsWith(MEDIAPIPE_LOG) ? Promise.resolve(new Response(null, { status: 204 })) : real.call(globalThis, input, init);
+  }) as typeof fetch;
+}
+
 export async function runPose(photo: Blob, modelPath: string): Promise<PoseOutput> {
+  blockMediapipeLogging();
   const vision = await import('@mediapipe/tasks-vision');
   const fileset = await vision.FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}vendor/mediapipe`);
   const bitmap = await (async () => {

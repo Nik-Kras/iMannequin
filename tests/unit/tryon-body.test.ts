@@ -95,6 +95,15 @@ describe('pose check (try-on §2.2)', () => {
     expect(top.find((i) => i.code === 'framing')?.detail).toContain('head');
   });
 
+  it('#51 still flags arms by the sides when the feet are out of the frame', () => {
+    const cut = good.lms.map((l) => ({ ...l }));
+    for (const i of [LM.ankleL, LM.ankleR, LM.heelL, LM.heelR, LM.toeL, LM.toeR]) cut[i] = { ...cut[i], y: 1.03, visibility: 0.1 };
+    for (const [s, wr] of [[LM.shoulderL, LM.wristL], [LM.shoulderR, LM.wristR]]) cut[wr] = { ...cut[wr], x: cut[s].x, y: cut[s].y + 0.25 };
+    const issues = checkPose(cut, { width: W, height: H }, bounds);
+    expect(issues.find((i) => i.code === 'framing')?.detail).toContain('feet');
+    expect(issues.find((i) => i.code === 'armAngle')?.detail).toMatch(/^low:/);
+  });
+
   it('flags points that are in the frame but not seen clearly', () => {
     const blur = good.lms.map((l, i) => (i === LM.kneeL ? { ...l, visibility: 0.2 } : l));
     expect(checkPose(blur, { width: W, height: H }, bounds).find((i) => i.code === 'visibility')?.detail).toBe('knees');

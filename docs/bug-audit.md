@@ -293,9 +293,16 @@ Everything is synthetic (R2): garments are the design canvas's paper shapes, the
     - "Looks like Olive skirt".
     - The search empty state repeats itself.
 
+### Found on the owner's phone after the audit (Android, Chrome)
+
+51. **High · A photo with the feet cut off says "We couldn't find a person".** MediaPipe found all 33 points, but the ankles and heels were outside the photo, so their visibility was low and no mannequin was made (it needs the feet for shoes). The check screen then showed "no person" for every photo without a mannequin, hiding the real reasons. The arm-angle check was also skipped whenever the ankles were out of the frame, so arms held by the sides weren't named.
+   - **Fix:** "no person" only when there are no points. Otherwise the screen lists the problems: feet cut off, arms too close (now measured from shoulders to hips when the feet are out of the frame). A rejected photo reaches Sentry as a warning with its issue codes (D50), so this is visible next time.
+52. **High · R1: MediaPipe posts usage logs to Google.** `@mediapipe/tasks-vision` 1.2.0 starts a logger with every task that posts to `odml.pa.googleapis.com` every minute and when the task closes. There is no option to turn it off. Sentry's network trace showed the request right after the pose model loaded.
+   - **Fix:** before MediaPipe loads, the app answers that address itself without the network; the logger treats the failure as final and stops. A test runs the real pose model and fails if any request leaves for a host other than the app and Sentry.
+
 ## Status
 
-**All 50 items are fixed (2026-10-28)**, two of them only in part: #9 and #40. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
+**All 50 items are fixed (2026-10-28)**, and so are #51–#52, found on the owner's phone the same evening, two of them only in part: #9 and #40. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
 
 **How it was fixed.** Four agents worked in parallel, each in its own git worktree and owning a set of files:
 - data, AI and memory;

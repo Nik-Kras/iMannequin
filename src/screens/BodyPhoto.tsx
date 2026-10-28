@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { goBack, navigate, useRoute } from '../app/router';
 import { updateSettings } from '../data/db';
-import { record, reportError, risky } from '../diag/diagnostics';
+import { record, reportError, reportProblem, risky } from '../diag/diagnostics';
 import type { BodyRecord } from '../domain/types';
 import { useI18n, type Key } from '../i18n';
 import { armAngles, DESIGN_BODY_PATH, DESIGN_HEAD, POSE_LIMITS, prepareBodyPhoto, processBodyPhoto, saveBodyRecord, type PoseIssue } from '../tryon';
@@ -72,7 +72,9 @@ export default function BodyPhoto() {
       setPhoto(blob);
       if (keep) await keepPending(blob);
       const r = await risky('body.process', () => processBodyPhoto(blob));
-      record('body.checked', { body: !!r.body, issues: r.issues.map((i) => i.code).join(',') || 'none' });
+      const issues = r.issues.map((i) => (i.detail ? `${i.code}:${i.detail}` : i.code)).join(' ') || 'none';
+      if (r.body) record('body.checked', { body: true, issues });
+      else reportProblem('body.rejected', { issues });
       setResult(r);
       setStep('check');
     } catch (err) {
@@ -256,28 +258,31 @@ function CheckList({ result }: { result: { body?: BodyRecord; issues: PoseIssue[
     const out: { ok: boolean; text: string }[] = [];
     const by = (c: PoseIssue['code']) => result.issues.find((i) => i.code === c);
     const vis = by('visibility');
-    if (vis?.detail === 'body' || !result.body) {
+    if (vis?.detail === 'body') {
       out.push({ ok: false, text: t('body.issue.noBody') });
       return out;
     }
+    // Without a mannequin (feet out of the frame, say) only the problems are listed, never "no person" (bug-audit #51).
+    const body = result.body;
     const arm = by('armAngle');
     if (arm) {
       const [kind, deg] = (arm.detail ?? 'low:0').split(':');
       out.push({ ok: false, text: t(kind === 'high' ? 'body.issue.armHigh' : 'body.issue.armLow', { deg }) });
-    } else {
-      const [a, b] = armAngles(result.body.landmarks);
+    } else if (body) {
+      const [a, b] = armAngles(body.landmarks);
       out.push({ ok: true, text: t('body.ok.arms', { deg: Math.round((a + b) / 2) }) });
     }
     const facing = by('facing');
     if (facing) out.push({ ok: false, text: t(facing.detail?.includes('back') ? 'body.issue.back' : 'body.issue.turned') });
-    else out.push({ ok: true, text: t('body.ok.facing') });
+    else if (body) out.push({ ok: true, text: t('body.ok.facing') });
     const framing = by('framing');
     const parts = framing?.detail?.split(',') ?? [];
     if (parts.includes('head')) out.push({ ok: false, text: t('body.issue.headCut') });
     if (parts.includes('feet')) out.push({ ok: false, text: t('body.issue.feetCut') });
     if (parts.includes('sides')) out.push({ ok: false, text: t('body.issue.sidesCut') });
     if (vis) out.push({ ok: false, text: t('body.issue.unclear', { parts: (vis.detail ?? '').split(',').map((p) => t(`body.part.${p}` as Key)).join(', ') }) });
-    if (!framing && !vis) out.push({ ok: true, text: t('body.ok.framing') });
+    if (!framing && !vis && body) out.push({ ok: true, text: t('body.ok.framing') });
+    if (!body && !out.some((c) => !c.ok)) out.push({ ok: false, text: t('body.issue.noBody') });
     return out;
   }, [result, t]);
   return (

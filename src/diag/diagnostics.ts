@@ -73,6 +73,12 @@ export function reportError(err: unknown, where: string, data?: Crumb['d']) {
   if (enabled) Sentry.captureException(err, { tags: { where }, extra: data });
 }
 
+/** A step that ended in a problem the user sees but no error, such as a rejected body photo (D50: technical data only). */
+export function reportProblem(what: string, data?: Crumb['d']) {
+  record(what, data);
+  if (enabled) Sentry.captureMessage(what, { level: 'warning', tags: { where: what }, extra: data });
+}
+
 /** Unhandled promise rejections go to the black box too (bug-audit #4); Sentry, when on, has its own handler. */
 export function watchUnhandled(target: Pick<Window, 'addEventListener'> = window): void {
   target.addEventListener('unhandledrejection', (e) => record('error unhandled', describeError((e as PromiseRejectionEvent).reason)));

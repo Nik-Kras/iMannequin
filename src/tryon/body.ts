@@ -51,9 +51,10 @@ function angleBetween(u: Pt, v: Pt): number {
 }
 
 /** Arm angles (left, right) from the body's vertical, in degrees. Landmarks are normalised to a w × h photo. */
-export function armAngles(lms: Landmark[], w = 1, h = 1): [number, number] {
+export function armAngles(lms: Landmark[], w = 1, h = 1, to: 'ankles' | 'hips' = 'ankles'): [number, number] {
   const P = (i: number) => px(lms[i], w, h);
-  const axis = { x: mid(P(LM.ankleL), P(LM.ankleR)).x - mid(P(LM.shoulderL), P(LM.shoulderR)).x, y: mid(P(LM.ankleL), P(LM.ankleR)).y - mid(P(LM.shoulderL), P(LM.shoulderR)).y };
+  const low = to === 'ankles' ? mid(P(LM.ankleL), P(LM.ankleR)) : mid(P(LM.hipL), P(LM.hipR));
+  const axis = { x: low.x - mid(P(LM.shoulderL), P(LM.shoulderR)).x, y: low.y - mid(P(LM.shoulderL), P(LM.shoulderR)).y };
   const arm = (s: number, wr: number) => angleBetween({ x: P(wr).x - P(s).x, y: P(wr).y - P(s).y }, axis);
   return [arm(LM.shoulderL, LM.wristL), arm(LM.shoulderR, LM.wristR)];
 }
@@ -89,9 +90,11 @@ export function checkPose(lms: Landmark[], size: { width: number; height: number
   const P = (i: number) => px(lms[i], w, h);
   const visible = (...idx: number[]) => idx.every((i) => (lms[i].visibility ?? 1) >= POSE_LIMITS.minVisibility && !out(lms[i]));
 
-  // Arm angle, measured against the body's own vertical so a slightly tilted photo still passes.
-  if (visible(LM.shoulderL, LM.shoulderR, LM.wristL, LM.wristR, LM.ankleL, LM.ankleR)) {
-    const [l, r] = armAngles(lms, w, h);
+  // Arm angle, measured against the body's own vertical so a slightly tilted photo still passes: shoulders to ankles,
+  // or to hips when the feet are out of the frame, so arms by the sides are still named (bug-audit #51).
+  const feet = visible(LM.ankleL, LM.ankleR);
+  if (visible(LM.shoulderL, LM.shoulderR, LM.wristL, LM.wristR) && (feet || visible(LM.hipL, LM.hipR))) {
+    const [l, r] = armAngles(lms, w, h, feet ? 'ankles' : 'hips');
     const lo = Math.min(l, r);
     const hi = Math.max(l, r);
     if (lo < POSE_LIMITS.armMin) issues.push({ code: 'armAngle', detail: `low:${Math.round(lo)}` });

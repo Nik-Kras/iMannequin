@@ -204,3 +204,26 @@ test('#3 Skip on the body photo reports a failed write instead of failing silent
   await expect(page.locator('.toast', { hasText: 'Couldn’t save' })).toBeVisible();
   await expect(page).toHaveURL(/#\/body/);
 });
+
+test.describe('found on the phone after the audit', () => {
+  test('#51 feet out of the frame: the check says so instead of "no person"', async ({ context, page }) => {
+    await fakeDevice(context);
+    await openApp(page, { onboarded: false, route: '/body?onboarding=1' });
+    await page.locator('input[type=file]:not([capture])').setInputFiles(await bodyFile(page, 'cropped'));
+    await expect(page.getByText(/Your feet are cut off/)).toBeVisible();
+    await expect(page.getByText(/couldn’t find a person/)).toHaveCount(0);
+    // A mannequin needs feet for shoes, so there is no way past this one.
+    await expect(page.getByRole('button', { name: 'Use anyway' })).toHaveCount(0);
+  });
+
+  test('#52 the pose model sends nothing to Google (R1)', async ({ context, page }) => {
+    await fakeDevice(context, { pose: false }); // the real MediaPipe
+    const hosts = new Set<string>();
+    context.on('request', (r) => { hosts.add(new URL(r.url()).host); }); // blob: and data: URLs have no host
+    await openApp(page, { onboarded: false, route: '/body?onboarding=1' });
+    await page.locator('input[type=file]:not([capture])').setInputFiles(await bodyFile(page, 'good'));
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Check your points|Let’s try another photo/, { timeout: 60_000 });
+    await page.waitForTimeout(1500); // the logger posts when the task closes
+    expect([...hosts].filter((h) => h && !h.startsWith('localhost') && !h.endsWith('.sentry.io'))).toEqual([]);
+  });
+});

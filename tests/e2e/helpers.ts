@@ -32,7 +32,9 @@ function pageLib({ SHAPES }: { SHAPES: Record<string, { vb: string; d: string; x
       const p = points(variant);
       return Array.from({ length: 33 }, (_, i) => {
         const q = m.transformPoint(new DOMPoint(p[i][0], p[i][1]));
-        return { x: q.x / W, y: q.y / H, z: 0, visibility: 0.98 };
+        // Like MediaPipe: a point outside the photo comes back with low visibility.
+        const inside = q.x >= 0 && q.x <= W && q.y >= 0 && q.y <= H;
+        return { x: q.x / W, y: q.y / H, z: 0, visibility: inside ? 0.98 : 0.05 };
       });
     },
     draw(g: CanvasRenderingContext2D, W: number, H: number, scene: { type: string; variant?: string; kind?: string; colour?: string; bg?: string }) {
