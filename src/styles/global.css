@@ -275,7 +275,9 @@ textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: ver
 .tab__icon { width: 52px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: var(--ink); }
 .tab[aria-current='page'] { color: var(--ink); font-weight: 600; }
 .tab[aria-current='page'] .tab__icon { background: var(--ink); color: var(--sheet); }
+/* Positioned so it paints above the torn edge (.tabbar::before), which otherwise cuts across its top (bug-audit #53). */
 .tab-add {
+  position: relative; z-index: 1;
   flex: none; width: 56px; height: 56px; margin-top: -13px; border-radius: 50%; border: 0;
   background: var(--ink); color: var(--sheet); display: flex; align-items: center; justify-content: center;
   box-shadow: 0 0 0 5px var(--sheet), 1px 5px 12px rgba(20, 20, 20, 0.3);

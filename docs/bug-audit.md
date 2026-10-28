@@ -300,9 +300,12 @@ Everything is synthetic (R2): garments are the design canvas's paper shapes, the
 52. **High · R1: MediaPipe posts usage logs to Google.** `@mediapipe/tasks-vision` 1.2.0 starts a logger with every task that posts to `odml.pa.googleapis.com` every minute and when the task closes. There is no option to turn it off. Sentry's network trace showed the request right after the pose model loaded.
    - **Fix:** before MediaPipe loads, the app answers that address itself without the network; the logger treats the failure as final and stops. A test runs the real pose model and fails if any request leaves for a host other than the app and Sentry.
 
+53. **Low · The centre + is cut by the tab bar's torn edge.** The torn paper strip along the top of the tab bar (`.tabbar::before`) is a positioned element, so it painted over the raised + and cut a band across its top, leaving a dark sliver above the zigzag. Found by the owner on the phone.
+   - **Fix:** the + is positioned above the strip; its white ring now covers the torn edge, as designed. A test checks that the top of the + is the button itself.
+
 ## Status
 
-**All 50 items are fixed (2026-10-28)**, and so are #51–#52, found on the owner's phone the same evening, two of them only in part: #9 and #40. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
+**All 50 items are fixed (2026-10-28)**, and so are #51–#53, found on the owner's phone afterwards, two of them only in part: #9 and #40. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
 
 **How it was fixed.** Four agents worked in parallel, each in its own git worktree and owning a set of files:
 - data, AI and memory;

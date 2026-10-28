@@ -444,3 +444,15 @@ test.describe('#39 #41 #42 #45 #47 #48 paper kit', () => {
     expect(d!.match(/M/g)!.length).toBe(2);
   });
 });
+
+test('#53 the centre + sits above the tab bar’s torn edge, not cut by it', async ({ page }) => {
+  await openApp(page, { seed: true });
+  const add = page.getByRole('link', { name: 'Add clothes' });
+  const b = (await add.boundingBox())!;
+  // Points across the button's top, where the torn paper edge runs: each must be the button itself.
+  const hits = await page.evaluate(({ x, y, w }) => [0.35, 0.5, 0.65].map((f) => {
+    const el = document.elementFromPoint(x + w * f, y + 4);
+    return !!el?.closest('.tab-add');
+  }), { x: b.x, y: b.y, w: b.width });
+  expect(hits).toEqual([true, true, true]);
+});
