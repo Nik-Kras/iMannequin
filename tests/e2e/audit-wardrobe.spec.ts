@@ -606,6 +606,14 @@ test('#48 options, cards and rows have a pressed state', async ({ page }) => {
   for (const cls of ['.wd-opt', '.wd-tagbtn', '.wd-rowlink', '.wd-placerow', '.wd-swapcard-item', '.wd-model']) expect(rules).toContain(`${cls}:active`);
 });
 
+test('#44 in Add clothes the message doesn’t cover the queue strip', async ({ page }) => {
+  await openApp(page, { route: '/add' });
+  await page.locator('label.wd-cam__side input[type=file]').setInputFiles([await garmentFile(page, 'tee')]);
+  await expect(toast(page)).toContainText('1 photo added');
+  const [a, b] = [(await toast(page).boundingBox())!, (await page.locator('.wd-cam__panel').boundingBox())!];
+  expect(a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
+});
+
 test.describe('#49 visual defects', () => {
   test('#49 Fix cut-out’s action bar has its own paper behind it', async ({ page }) => {
     await openApp(page);
