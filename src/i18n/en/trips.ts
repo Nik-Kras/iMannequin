@@ -45,6 +45,8 @@ export default {
   'trips.pickOutfits': 'Outfits for this trip',
   'trips.pickPieces': 'Pieces for this trip',
   'trips.inOutfit': 'in an outfit',
+  'trips.findPiece': 'Find a piece',
+  'trips.noPieceMatch': 'Nothing matches.',
   'trips.noOutfits': 'No saved outfits yet. Save one on Dress-up first.',
   'trips.menu': 'Trip options',
   'trips.edit': 'Edit name and dates',

@@ -3,6 +3,7 @@ import '../styles/life.css';
 import { useState } from 'react';
 import { useI18n, type Key } from '../i18n';
 import { updateSettings } from '../data/db';
+import { useAction } from '../ui/action';
 import { LIcon, Rich, type LifeIconName } from '../life/ui';
 
 type Os = 'ios' | 'android';
@@ -33,6 +34,7 @@ const ICON = `${import.meta.env.BASE_URL}icon-192.png`;
 export default function InstallGuide() {
   const { t } = useI18n();
   const [os, setOs] = useState<Os>(guessOs);
+  const keep = useAction('install.keep', () => updateSettings({ installGuideDismissed: true }), { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
   const apps: { label: string; me?: boolean }[] = [
     { label: t('onboarding.install.appPhotos') },
     { label: t('onboarding.install.appNotes') },
@@ -78,9 +80,11 @@ export default function InstallGuide() {
       </div>
 
       <div className="pad install__foot">
-        <button type="button" className="btn btn--secondary btn--block" onClick={() => void updateSettings({ installGuideDismissed: true })}>
+        <button type="button" className="btn btn--secondary btn--block" disabled={keep.busy} onClick={() => void keep.run()}>
           {t('onboarding.install.keep')}
         </button>
+        {/* A tab and the installed app don't share their data (bug-audit #31). */}
+        <p className="install__note">{t('onboarding.install.separate')}</p>
       </div>
     </div>
   );

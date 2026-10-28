@@ -15,6 +15,7 @@ export default {
   'action.delete': 'Видалити',
   'action.done': 'Готово',
   'action.continue': 'Далі',
+  'action.undo': 'Скасувати',
   'action.retry': 'Спробувати ще',
   'action.seeAll': 'Усі',
   'action.edit': 'Змінити',

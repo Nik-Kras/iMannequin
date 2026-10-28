@@ -1,13 +1,14 @@
 // F8: saved outfits on the mannequin, with the "not worn in N months" strip (board Outfits.dc.html).
 import '../styles/life.css';
 import { useCallback, useMemo, useState } from 'react';
-import { db } from '../data/db';
+import { db, getSettings } from '../data/db';
 import { setDraft, useActiveItems, useSettings } from '../data/repo';
 import { useI18n } from '../i18n';
 import { navigate } from '../app/router';
 import { Empty, Sheet, Toast } from '../ui/parts';
 import { Icon } from '../ui/icons';
-import type { Outfit } from '../domain/types';
+import { attempt, notify, useAction } from '../ui/action';
+import type { Outfit, OutfitDraft } from '../domain/types';
 import { useOutfits, useWear } from '../life/hooks';
 import { outfitWearStats, parseISO } from '../life/calendar';
 import { OutfitsHeader, sinceLabel } from '../life/outfits';
@@ -16,6 +17,9 @@ import { withoutOutfit } from '../life/trips';
 import { ConfirmSheet, LIcon, MiniMannequin, PieceImg, SheetHead } from '../life/ui';
 
 const TILTS = [-0.6, 0.5, 0.4, -0.5];
+
+/** A Dress-up look that isn't a saved outfit: putting on a saved one would lose it. */
+const unsaved = (d: OutfitDraft): boolean => !d.outfitId && (Object.values(d.slots).some(Boolean) || d.accessories.length > 0);
 
 /** Deletes an outfit and takes it out of trips and the current draft. Wear history stays. */
 async function deleteOutfit(o: Outfit): Promise<void> {
@@ -43,9 +47,19 @@ export default function Outfits() {
   const stale = useMemo(() => notWornItems(items ?? [], months), [items, months]);
   const clearToast = useCallback(() => setToast(undefined), []);
 
-  const open = async (o: Outfit) => {
+  const putOn = useAction('outfit.open', async (o: Outfit) => {
+    const before = (await getSettings()).draft;
     await setDraft(draftFromOutfit(o));
+    return before;
+  }, { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
+  const open = async (o: Outfit) => {
+    const before = await putOn.run(o);
+    if (!before) return;
     navigate('/dressup');
+    // An unsaved look was on the mannequin: offer it back (bug-audit #21).
+    if (unsaved(before)) {
+      notify({ text: t('outfits.replaced'), actionLabel: t('action.undo'), action: () => void attempt('outfit.undo', () => setDraft(before), t('state.saveFailed')) });
+    }
   };
 
   const wornLine = (o: Outfit) => {
@@ -68,7 +82,7 @@ export default function Outfits() {
         {!!outfits?.length && (
           <ul className="outfit-grid">
             {outfits.map((o, i) => (
-              <li key={o.id} className="outfit-card card" style={{ transform: `rotate(${TILTS[i % 4]}deg)` }}>
+              <li key={o.id} className={`outfit-card card${o.name.length > 13 ? ' outfit-card--long' : ''}`} style={{ transform: `rotate(${TILTS[i % 4]}deg)` }}>
                 <button type="button" className="outfit-card__open" aria-label={t('outfits.open', { name: o.name })} onClick={() => void open(o)}>
                   <span className="outfit-card__doll"><MiniMannequin draft={draftFromOutfit(o)} height={160} /></span>
                   <span className="outfit-card__worn">{wornLine(o)}</span>
@@ -116,14 +130,17 @@ function OutfitSheet({ outfit, onClose, onDeleted }: { outfit: Outfit; onClose: 
   const [name, setName] = useState(outfit.name);
   const [confirm, setConfirm] = useState(false);
   const trimmed = name.trim();
-  const save = async () => {
+  const opts = { errorText: t('state.saveFailed'), retryLabel: t('action.retry') };
+  const rename = useAction('outfit.rename', async () => {
     if (trimmed && trimmed !== outfit.name) await db.outfits.update(outfit.id, { name: trimmed, updatedAt: Date.now() });
-    onClose();
-  };
+    return true;
+  }, opts);
+  const remove = useAction('outfit.delete', async () => { await deleteOutfit(outfit); return true; }, opts);
+  const save = async () => { if (await rename.run()) onClose(); };
   if (confirm) {
     return (
-      <ConfirmSheet title={t('outfits.delete')} text={t('outfits.deleteConfirm', { name: outfit.name })} confirm={t('action.delete')} danger
-        onClose={() => setConfirm(false)} onConfirm={() => void deleteOutfit(outfit).then(onDeleted)} />
+      <ConfirmSheet title={t('outfits.delete')} text={t('outfits.deleteConfirm', { name: outfit.name })} confirm={t('action.delete')} danger busy={remove.busy}
+        onClose={() => setConfirm(false)} onConfirm={() => void remove.run().then((ok) => { if (ok) onDeleted(); })} />
     );
   }
   return (
@@ -134,7 +151,7 @@ function OutfitSheet({ outfit, onClose, onDeleted }: { outfit: Outfit; onClose: 
           <span className="field__label">{t('outfits.name')}</span>
           <input className="input" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} enterKeyHint="done" />
         </label>
-        <button type="submit" className="btn btn--primary btn--block" disabled={!trimmed}>{t('action.save')}</button>
+        <button type="submit" className="btn btn--primary btn--block" disabled={!trimmed || rename.busy}>{t('action.save')}</button>
         <div className="life-pair">
           <button type="button" className="btn btn--secondary" onClick={() => navigate(`/share?outfit=${outfit.id}`)}>
             <Icon name="share" size={20} />{t('outfits.share')}

@@ -77,24 +77,28 @@
 .install__appname { font: 400 12px var(--font-text); color: var(--graphite); white-space: nowrap; }
 .install__app--me .install__appname { color: var(--ink); font-weight: 600; }
 .install__after { display: flex; gap: 12px; align-items: center; font: 400 15px/1.4 var(--font-text); }
-.install__foot { margin-top: auto; padding-top: 24px; }
+.install__foot { margin-top: auto; padding-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+.install__note { font: 400 13.5px/1.4 var(--font-text); color: var(--graphite); text-align: center; }
 
 /* ---------- Outfits (board Outfits) ---------- */
 .outfit-grid {
   list-style: none; margin: 0; padding: 0 16px;
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
 }
-.outfit-card { height: 232px; }
+.outfit-card { min-height: 232px; }
 .outfit-card__open {
-  width: 100%; height: 100%; border: 0; border-radius: var(--r-card); background: transparent; color: var(--ink);
+  width: 100%; height: 100%; min-height: 232px; border: 0; border-radius: var(--r-card); background: transparent; color: var(--ink);
   display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 34px 8px 10px;
 }
+.outfit-card--long .outfit-card__open { padding-top: 54px; }
 .outfit-card__doll { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .outfit-card__worn { font: 400 12.5px/1.3 var(--font-text); color: var(--graphite); text-align: center; }
 .outfit-card__tag {
   position: absolute; left: 8px; top: 8px; max-width: calc(100% - 56px); padding: 0 8px; pointer-events: none;
   border: 1.5px solid var(--ink); border-radius: 3px 10px 10px 3px; background: var(--sheet);
-  font: 600 18px/1.3 var(--font-hand); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: rotate(-3deg);
+  font: 600 18px/1.1 var(--font-hand); transform: rotate(-3deg); overflow-wrap: anywhere;
+  /* Two lines before it is cut (bug-audit #40). */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .outfit-card__more {
   position: absolute; right: 0; top: 0; width: 44px; height: 44px; border: 0; border-radius: 50%;
@@ -119,24 +123,32 @@
 .wearcal__nav:disabled { color: var(--dash); cursor: default; }
 .wearcal__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .wearcal__wd { text-align: center; font: 400 12px var(--font-text); color: var(--graphite); }
+.wearcal__day { display: block; }
 .wearcal__cell {
-  position: relative; height: 44px; border-radius: 6px; padding: 3px 4px;
-  display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; width: 100%; height: 44px; border: 0; border-radius: 6px; padding: 3px 4px; background: transparent; color: var(--ink);
+  display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; text-align: left;
 }
+button.wearcal__cell:active { background: var(--rule); }
 .wearcal__cell--worn { background: var(--tissue); }
 .wearcal__cell--today { box-shadow: inset 0 0 0 2px var(--ink); }
 .wearcal__n { font: 400 12.5px/1.2 var(--font-text); }
 .wearcal__cell--today .wearcal__n { font-weight: 600; }
 .wearcal__cell--future .wearcal__n { color: var(--graphite); }
 .wearcal__sw { display: flex; gap: 2px; height: 8px; }
-.wearcal__sw span { width: 8px; height: 8px; border-radius: 2px; box-shadow: 0 0 0 0.5px rgba(20, 20, 20, 0.28); }
+.wearcal__sw span { width: 8px; height: 8px; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
 .wearcal__stamp {
   position: absolute; right: -12px; bottom: -14px; z-index: 1; height: 20px; padding: 0 5px; pointer-events: none;
   display: flex; align-items: center; border: 1.5px solid var(--ink); border-radius: 5px; background: var(--sheet);
   font: 700 15px/1 var(--font-hand); opacity: 0.9; transform: rotate(-10deg); white-space: nowrap;
 }
 .recent { list-style: none; margin: 0; padding: 0 16px; }
-.recent__row { min-height: 64px; padding: 6px 12px 6px 8px; display: flex; align-items: center; gap: 10px; }
+.recent__row {
+  width: 100%; min-height: 64px; padding: 6px 12px 6px 8px; display: flex; align-items: center; gap: 10px;
+  border: 0; color: var(--ink); text-align: left; font: inherit;
+}
+.recent__row:active { background: var(--tissue); }
+.day-log { list-style: none; margin: 0; padding: 0; }
+.day-log__row { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 8px; box-shadow: none; border: 1px solid var(--rule); }
 .recent__doll { flex: none; width: 34px; height: 52px; display: flex; align-items: center; justify-content: center; }
 .recent__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .recent__when { flex: none; font: 600 18px var(--font-hand); color: var(--graphite); }
@@ -187,7 +199,7 @@
 .trip-card__look { width: 40px; height: 74px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .trip-card__progress { padding-top: 2px; }
 .trip-card__packed { font: 600 14px var(--font-text); }
-.trip-card__progress .bar { box-shadow: inset 0 0 0 1px var(--rule); }
+.trip-card__progress .bar { box-shadow: inset 0 0 0 1px var(--line); }
 .trip-card__stamp { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 
 /* ---------- Trip checklist (board TripChecklist) ---------- */
@@ -196,15 +208,18 @@
 .trip__count { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .trip__packed { font: 600 17px var(--font-text); }
 .trip__left { font: 600 19px var(--font-hand); color: var(--graphite); white-space: nowrap; }
-.trip__progress .bar { height: 8px; border-radius: 4px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule); }
+.trip__progress .bar { height: 8px; border-radius: 4px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--line); }
 .trip__progress .bar > span { border-radius: 4px; }
 .trip__hint { margin-top: 2px; font: 400 14px/1.4 var(--font-text); color: var(--graphite); }
 .trip__h { margin: 18px 0 8px; }
 .trip__looks { list-style: none; margin: 0; padding-block: 2px 8px; gap: 8px; }
-.trip-look { flex: none; width: 92px; height: 136px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.trip-look__name { max-width: 100%; font: 600 18px/1.1 var(--font-hand); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trip-look { flex: none; width: 92px; min-height: 136px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.trip-look__name {
+  max-width: 100%; font: 600 17px/1 var(--font-hand); text-align: center; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; /* two lines (bug-audit #40) */
+}
 .trip__add-look { flex: 1 0 56px; }
-.trip__add-look .dashed-slot { width: 100%; height: 136px; display: flex; align-items: center; justify-content: center; color: var(--ink); }
+.trip__add-look .dashed-slot { width: 100%; height: 100%; min-height: 136px; display: flex; align-items: center; justify-content: center; color: var(--ink); }
 .trip__empty { margin-top: 8px; }
 .trip__groups { margin-top: 14px; }
 .trip-group__head { padding: 0 20px 0 16px; min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -234,14 +249,15 @@
 .trip-piece__stamp--long { font-size: 14px; padding: 0 3px; min-width: 0; }
 @keyframes life-stamp { from { opacity: 0; scale: 1.6; } }
 .trip__add-pieces { margin-top: 18px; }
-.trip__dashed { height: 48px; border: 1.5px dashed var(--dash); background: transparent; color: var(--ink); }
+.trip__dashed { height: 48px; border: 1.5px dashed var(--line); background: transparent; color: var(--ink); }
 
 /* Pickers in sheets (outfits and pieces for a trip). */
+.life-sheet input[type='search'] { -webkit-appearance: none; appearance: none; flex: none; }
 .picker { list-style: none; margin: 0; padding: 2px 0; display: grid; gap: 8px; }
 .picker--looks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .picker--pieces { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .picker__cell {
-  position: relative; width: 100%; height: 100%; min-height: 88px; border: 1.5px solid var(--pencil); border-radius: var(--r-card);
+  position: relative; width: 100%; height: 100%; min-height: 88px; border: 1.5px solid var(--line); border-radius: var(--r-card);
   background: var(--sheet); color: var(--ink); padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
 .picker__cell[aria-pressed='true'] { border: 2px solid var(--ink); box-shadow: var(--shadow-lift); }
@@ -252,7 +268,10 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .picker__sub { font: 400 12px var(--font-text); color: var(--graphite); }
-.picker__look-name { max-width: 100%; font: 600 17px/1.1 var(--font-hand); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker__look-name {
+  max-width: 100%; font: 600 17px/1 var(--font-hand); text-align: center; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .picker__check {
   position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%;
   background: var(--ink); color: var(--sheet); display: flex; align-items: center; justify-content: center;
@@ -268,7 +287,7 @@
 .set-seg .seg button { height: 36px; border-radius: 18px; font-size: 15px; }
 .set-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .set-mode {
-  height: 104px; border: 1.5px solid var(--pencil); border-radius: var(--r-card); background: var(--sheet);
+  height: 104px; border: 1.5px solid var(--line); border-radius: var(--r-card); background: var(--sheet);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 6px;
   font: 500 14px var(--font-text); color: var(--ink);
 }
@@ -309,16 +328,26 @@
 /* ---------- Backup reminder (D41) ---------- */
 /* While the banner shows, the screen under it starts lower, so nothing is covered. */
 main:has(+ .backup-reminder) > .screen { padding-top: calc(var(--safe-top) + 14px + 76px); }
+/* A quiet paper note, not a warning (bug-audit #36). */
 .backup-reminder {
-  position: absolute; top: calc(var(--safe-top) + 10px); left: 16px; right: 16px; z-index: 5; width: auto;
-  min-height: 60px; padding: 6px 4px 6px 14px; gap: 8px; font: 500 14px/1.3 var(--font-text);
-  box-shadow: var(--shadow-button); animation: fade-in 200ms;
+  position: absolute; top: calc(var(--safe-top) + 10px); left: 16px; right: 16px; z-index: 5;
+  display: flex; align-items: center; gap: 8px; min-height: 60px; padding: 6px 4px 6px 14px;
+  font: 500 14px/1.3 var(--font-text); color: var(--ink); animation: fade-in 200ms;
 }
+.backup-reminder > svg { flex: none; }
 .backup-reminder__go {
-  flex: none; height: 40px; padding: 0 14px; border: 0; border-radius: 10px;
+  flex: none; height: 44px; padding: 0 14px; border: 1.5px solid var(--ink); border-radius: 12px;
   background: var(--sheet); color: var(--ink); font: 600 14px var(--font-text);
 }
 .backup-reminder__x {
-  flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--sheet);
+  flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--graphite);
   display: flex; align-items: center; justify-content: center;
+}
+/* Narrow phones and page zoom: the action goes under the text, and the screen starts lower to match. */
+@media (max-width: 380px) {
+  .backup-reminder { flex-wrap: wrap; row-gap: 2px; padding: 6px 4px 10px 14px; }
+  .backup-reminder > .grow { flex-basis: calc(100% - 92px); }
+  .backup-reminder__x { order: 1; }
+  .backup-reminder__go { order: 2; margin-left: 28px; }
+  main:has(+ .backup-reminder) > .screen { padding-top: calc(var(--safe-top) + 14px + 122px); }
 }

@@ -29,4 +29,5 @@ export default {
   'onboarding.install.appWeather': 'Weather',
   'onboarding.install.after': 'Then it opens full screen, like an app, and works offline.',
   'onboarding.install.keep': 'Keep using it in the browser',
+  'onboarding.install.separate': 'A browser tab and the home-screen app keep separate wardrobes, and Safari may clear a tab’s data after 7 days without a visit.',
 } as const;

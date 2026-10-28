@@ -11,7 +11,9 @@ import { useI18n } from '../i18n';
 import { navigate, useRoute } from '../app/router';
 import { Header, ProgressBar, Segmented, Sheet, Switch, Toast } from '../ui/parts';
 import { Icon } from '../ui/icons';
-import type { AiTask } from '../domain/types';
+import { attempt, useAction } from '../ui/action';
+import { inPhoneBrowserTab } from '../app/display';
+import type { AiTask, AppSettings } from '../domain/types';
 import { switchLanguage } from '../life/lang';
 import { sessionCode } from '../diag/diagnostics';
 import { ConfirmSheet, downloadBlob, formatBytes, LIcon, SheetHead, shareFile } from '../life/ui';
@@ -72,6 +74,34 @@ export default function Settings() {
   const fileInput = useRef<HTMLInputElement>(null);
   const backupCard = useRef<HTMLElement>(null);
   const clearToast = useCallback(() => setToast(undefined), []);
+  const [browserTab] = useState(inPhoneBrowserTab);
+  // Every switch and choice reports a failed save (bug-audit #3).
+  const failed = { errorText: t('state.saveFailed'), retryLabel: t('action.retry') };
+  const save = useAction('settings.save', (patch: Partial<AppSettings>) => updateSettings(patch), failed);
+  const language = useAction('settings.lang', switchLanguage, failed);
+  const weatherAction = useAction('settings.weather', async (on: boolean) => {
+    if (!on) {
+      setWx('idle');
+      await updateSettings({ weather: { enabled: false } });
+      return;
+    }
+    setWx('asking');
+    let where: { lat: number; lon: number };
+    try {
+      where = await requestRoundedLocation();
+    } catch {
+      setWx('denied');
+      return;
+    }
+    await updateSettings({ weather: { enabled: true, ...where } });
+    setWx('idle');
+  }, failed);
+  const removeOriginal = useAction('settings.deleteOriginal', async () => {
+    // D48: the original photo goes; the cut-out and mask stay, so the mannequin keeps working.
+    const b = await db.body.get('current');
+    if (b) await db.body.put(await withFreshBlobs({ ...b, photo: new Blob([], { type: b.photo.type }) }));
+    return true;
+  }, failed);
 
   useEffect(() => {
     void (async () => {
@@ -88,22 +118,6 @@ export default function Settings() {
   }, [section, settings === undefined]);
 
   if (!settings) return <div className="screen screen--no-tabs" />;
-
-  const setWeather = async (on: boolean) => {
-    if (!on) {
-      setWx('idle');
-      await updateSettings({ weather: { enabled: false } });
-      return;
-    }
-    setWx('asking');
-    try {
-      const { lat, lon } = await requestRoundedLocation();
-      await updateSettings({ weather: { enabled: true, lat, lon } });
-      setWx('idle');
-    } catch {
-      setWx('denied');
-    }
-  };
 
   const finishBackup = async (file: File) => {
     const r = await shareFile(file);
@@ -165,9 +179,7 @@ export default function Settings() {
   };
 
   const deleteOriginal = async () => {
-    // D48: the original photo goes; the cut-out and mask stay, so the mannequin keeps working.
-    const b = await db.body.get('current');
-    if (b) await db.body.put(await withFreshBlobs({ ...b, photo: new Blob([], { type: b.photo.type }) }));
+    if (!(await removeOriginal.run())) return;
     setPanel(undefined);
     setToast(t('settings.originalDeleted'));
   };
@@ -183,7 +195,7 @@ export default function Settings() {
         <section className="card card--pad set-card" aria-labelledby="set-lang">
           <h2 id="set-lang" className="title-card">{t('settings.language')}</h2>
           <div className="set-seg">
-            <Segmented label={t('settings.language')} value={settings.lang} onChange={(v) => void switchLanguage(v)}
+            <Segmented label={t('settings.language')} value={settings.lang} onChange={(v) => void language.run(v)}
               options={[{ value: 'en', label: 'English' }, { value: 'uk', label: 'Українська' }]} />
           </div>
         </section>
@@ -191,15 +203,15 @@ export default function Settings() {
         <section className="card card--pad set-card" aria-labelledby="set-mq">
           <h2 id="set-mq" className="title-card">{t('settings.mannequin')}</h2>
           <div className="set-modes" role="group" aria-label={t('settings.mannequinAs')}>
-            <button type="button" className="set-mode" aria-pressed={settings.mannequin === 'photo'} onClick={() => void updateSettings({ mannequin: 'photo' })}>
+            <button type="button" className="set-mode" aria-pressed={settings.mannequin === 'photo'} onClick={() => void save.run({ mannequin: 'photo' })}>
               <Figure />{t('settings.myPhoto')}
             </button>
-            <button type="button" className="set-mode" aria-pressed={settings.mannequin === 'outline'} onClick={() => void updateSettings({ mannequin: 'outline' })}>
+            <button type="button" className="set-mode" aria-pressed={settings.mannequin === 'outline'} onClick={() => void save.run({ mannequin: 'outline' })}>
               <Figure outline />{t('settings.outline')}
             </button>
           </div>
           <div className="set-rows">
-            <Row label={t('settings.retake')} onClick={() => navigate('/body')} />
+            <Row label={body ? t('settings.retake') : t('settings.takeBody')} onClick={() => navigate('/body')} />
             {body && body.photo.size > 0 && (
               <button type="button" className="set-row set-row--danger" onClick={() => setPanel('deleteOriginal')}>
                 <span className="grow">{t('settings.deleteOriginal')}</span>
@@ -212,7 +224,7 @@ export default function Settings() {
         <section className="card card--pad set-card" aria-labelledby="set-wx">
           <div className="set-card__row">
             <h2 id="set-wx" className="title-card grow">{t('settings.weather')}</h2>
-            <Switch checked={settings.weather.enabled} onChange={(v) => void setWeather(v)} label={<span className="sr-only">{t('settings.weather')}</span>} />
+            <Switch checked={settings.weather.enabled} onChange={(v) => void weatherAction.run(v)} label={<span className="sr-only">{t('settings.weather')}</span>} />
           </div>
           <p className="set-text">{settings.weather.enabled ? t('settings.weatherOn') : t('settings.weatherOff')}</p>
           {wx === 'asking' && <p className="set-text set-text--ink" role="status"><span className="spinner" aria-hidden="true" />{t('settings.weatherAsking')}</p>}
@@ -250,6 +262,8 @@ export default function Settings() {
               : <><Icon name="warning" size={20} />{t('settings.neverBacked')}</>}
           </p>
           <p className="set-text">{t('settings.backupText')}</p>
+          {/* A browser tab keeps its own data (bug-audit #31). */}
+          {browserTab && <p className="set-text">{t('settings.browserTab')}</p>}
           {backup.state === 'building' && (
             <div className="stack gap-8" role="status">
               <span className="set-text set-text--ink">{t('settings.exporting')}</span>
@@ -260,10 +274,10 @@ export default function Settings() {
           {backup.state === 'ready' && (
             <div className="stack gap-8">
               <p className="set-text set-text--ink">{t('settings.exportReady', { size: formatBytes(backup.file.size, lang) })}</p>
-              <button type="button" className="btn btn--primary btn--block" onClick={() => void finishBackup(backup.file)}>
+              <button type="button" className="btn btn--primary btn--block" onClick={() => void attempt('backup.finish', () => finishBackup(backup.file), t('state.saveFailed'))}>
                 <Icon name="share" size={18} />{t('settings.saveFile')}
               </button>
-              <button type="button" className="text-action set-download" onClick={() => void downloadBackup(backup.file)}>{t('settings.downloadInstead')}</button>
+              <button type="button" className="text-action set-download" onClick={() => void attempt('backup.download', () => downloadBackup(backup.file), t('state.saveFailed'))}>{t('settings.downloadInstead')}</button>
             </div>
           )}
           {error && <p className="set-text set-text--error" role="alert">{error}</p>}
@@ -280,7 +294,7 @@ export default function Settings() {
         <section className="card card--pad set-card" aria-labelledby="set-diag">
           <div className="set-card__row">
             <h2 id="set-diag" className="title-card grow">{t('settings.diagnostics')}</h2>
-            <Switch checked={settings.diagnostics} onChange={(v) => void updateSettings({ diagnostics: v })} label={<span className="sr-only">{t('settings.diagnostics')}</span>} />
+            <Switch checked={settings.diagnostics} onChange={(v) => void save.run({ diagnostics: v })} label={<span className="sr-only">{t('settings.diagnostics')}</span>} />
           </div>
           <p className="set-text">{t('settings.diagnosticsText')}</p>
           <p className="set-text set-text--ink" style={{ userSelect: 'all', WebkitUserSelect: 'all' }}>{t('settings.diagnosticsCode', { code: sessionCode() })}</p>
@@ -308,7 +322,7 @@ export default function Settings() {
             <div className="set-chips" role="group" aria-label={t('settings.notWornAfter')}>
               {MONTH_OPTIONS.map((m) => (
                 <button key={m} type="button" className="chip" aria-pressed={settings.notWornMonths === m}
-                  onClick={() => { void updateSettings({ notWornMonths: m }); setPanel(undefined); }}>
+                  onClick={() => { void save.run({ notWornMonths: m }); setPanel(undefined); }}>
                   {tn('settings.months', m)}
                 </button>
               ))}
@@ -321,7 +335,7 @@ export default function Settings() {
 
       {panel === 'deleteOriginal' && (
         <ConfirmSheet title={t('settings.deleteOriginal')} text={<>{t('settings.deleteOriginalConfirm')}<br /><br />{t('settings.deleteOriginalNote')}</>}
-          confirm={t('action.delete')} danger onClose={() => setPanel(undefined)} onConfirm={() => void deleteOriginal()} />
+          confirm={t('action.delete')} danger busy={removeOriginal.busy} onClose={() => setPanel(undefined)} onConfirm={() => void deleteOriginal()} />
       )}
 
       {pending && counts && (

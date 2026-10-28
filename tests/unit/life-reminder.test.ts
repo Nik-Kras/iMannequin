@@ -10,15 +10,15 @@ describe('backup reminder', () => {
     expect(shouldRemindBackup({ itemCount: 0, now })).toBe(false);
   });
   it('shows when there was never a backup', () => {
-    expect(shouldRemindBackup({ itemCount: 1, now })).toBe(true);
+    expect(shouldRemindBackup({ itemCount: 10, now })).toBe(true);
   });
   it('stays hidden for 30 days after a backup', () => {
-    expect(shouldRemindBackup({ itemCount: 5, lastBackupAt: now - 29 * day, now })).toBe(false);
-    expect(shouldRemindBackup({ itemCount: 5, lastBackupAt: now - BACKUP_INTERVAL_MS, now })).toBe(true);
+    expect(shouldRemindBackup({ itemCount: 12, lastBackupAt: now - 29 * day, now })).toBe(false);
+    expect(shouldRemindBackup({ itemCount: 12, lastBackupAt: now - BACKUP_INTERVAL_MS, now })).toBe(true);
   });
   it('stays hidden for 30 days after it was dismissed', () => {
-    expect(shouldRemindBackup({ itemCount: 5, backupReminderAt: now - 10 * day, now })).toBe(false);
-    expect(shouldRemindBackup({ itemCount: 5, lastBackupAt: now - 90 * day, backupReminderAt: now - 31 * day, now })).toBe(true);
+    expect(shouldRemindBackup({ itemCount: 12, backupReminderAt: now - 10 * day, now })).toBe(false);
+    expect(shouldRemindBackup({ itemCount: 12, lastBackupAt: now - 90 * day, backupReminderAt: now - 31 * day, now })).toBe(true);
   });
 });
 

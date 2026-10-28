@@ -46,6 +46,8 @@ export default {
   'trips.pickOutfits': 'Образи для поїздки',
   'trips.pickPieces': 'Речі для поїздки',
   'trips.inOutfit': 'в образі',
+  'trips.findPiece': 'Знайти річ',
+  'trips.noPieceMatch': 'Нічого не знайдено.',
   'trips.noOutfits': 'Збережених образів ще немає. Спершу збережіть образ у примірці.',
   'trips.menu': 'Дії з поїздкою',
   'trips.edit': 'Змінити назву й дати',

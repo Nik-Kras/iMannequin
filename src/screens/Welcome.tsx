@@ -6,6 +6,7 @@ import { navigate } from '../app/router';
 import { Mannequin } from '../tryon';
 import { LIcon } from '../life/ui';
 import { switchLanguage } from '../life/lang';
+import { useAction } from '../ui/action';
 import type { Lang } from '../domain/types';
 
 const EMPTY = { slots: {}, accessories: [], toggles: { tuckIn: false, intoBoots: false } };
@@ -24,6 +25,7 @@ const TORN = tornPath();
 
 export default function Welcome() {
   const { t, lang } = useI18n();
+  const language = useAction('welcome.lang', switchLanguage, { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   // The hero is at most half the screen; the mannequin fits inside it.
   const [dollH] = useState(() => Math.round(Math.min(340, Math.min(432, window.innerHeight * 0.51) - 70)));
@@ -45,7 +47,7 @@ export default function Welcome() {
           <span id="welcome-lang" className="welcome__label">{t('onboarding.language')}</span>
           <div className="life-bigseg">
             {LANGS.map((l) => (
-              <button key={l.code} type="button" lang={l.code} aria-pressed={lang === l.code} onClick={() => void switchLanguage(l.code)}>{l.label}</button>
+              <button key={l.code} type="button" lang={l.code} aria-pressed={lang === l.code} onClick={() => void language.run(l.code)}>{l.label}</button>
             ))}
           </div>
         </div>

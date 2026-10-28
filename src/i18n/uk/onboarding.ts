@@ -29,4 +29,5 @@ export default {
   'onboarding.install.appWeather': 'Погода',
   'onboarding.install.after': 'Потім він відкривається на весь екран, як застосунок, і працює без інтернету.',
   'onboarding.install.keep': 'Залишитися в браузері',
+  'onboarding.install.separate': 'Вкладка браузера й програма на початковому екрані мають окремі гардероби, а Safari може стерти дані вкладки, якщо не відкривати її 7 днів.',
 } satisfies Record<keyof typeof en, string>;

@@ -15,6 +15,7 @@ export default {
   'action.done': 'Done',
   'action.continue': 'Continue',
   'action.retry': 'Try again',
+  'action.undo': 'Undo',
   'action.seeAll': 'See all',
   'action.edit': 'Edit',
   'action.add': 'Add',

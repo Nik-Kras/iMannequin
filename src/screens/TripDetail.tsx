@@ -7,7 +7,8 @@ import { useI18n } from '../i18n';
 import { goBack } from '../app/router';
 import { Empty, Header, ProgressBar, Sheet } from '../ui/parts';
 import { Icon } from '../ui/icons';
-import type { Item, Outfit, Trip } from '../domain/types';
+import { attempt, useAction } from '../ui/action';
+import type { CategoryId, Item, Outfit, Trip } from '../domain/types';
 import { useById, useItemsById, useOutfits, useTrip } from '../life/hooks';
 import { checklist, outfitPieceIds, setTripItem, setTripOutfit, togglePacked, tripOutfitIds } from '../life/trips';
 import { byCategory, draftFromOutfit } from '../life/wardrobe';
@@ -30,6 +31,13 @@ export default function TripDetail({ tripId }: { tripId?: string }) {
   const due = useDueLabel();
   const dates = useTripDates();
   const [panel, setPanel] = useState<Panel>();
+  const saveFailed = { errorText: t('state.saveFailed'), retryLabel: t('action.retry') };
+  // Writes report failures (bug-audit #3). Ticking pieces may be quick: each tap is its own write.
+  const archive = useAction('trip.archive', (id: string) => updateTrip(id, (cur) => ({ ...cur, archived: !cur.archived })), saveFailed);
+  const remove = useAction('trip.delete', async (id: string) => {
+    await db.trips.delete(id);
+    goBack('/trips');
+  }, saveFailed);
 
   if (trip === null) {
     return (
@@ -44,6 +52,7 @@ export default function TripDetail({ tripId }: { tripId?: string }) {
   const list = checklist(trip, outfitsById, items, locations);
   const looks = tripOutfitIds(trip).map((id) => outfitsById.get(id)).filter((o): o is Outfit => !!o);
   const left = list.total - list.packed;
+  const dueText = due(trip);
 
   return (
     <div className="screen screen--no-tabs trip">
@@ -53,7 +62,7 @@ export default function TripDetail({ tripId }: { tripId?: string }) {
         )} />
       <div className="pad stack gap-4">
         <h1 className="h1">{trip.name}</h1>
-        <p className="trip__meta">{dates(trip)}{trip.archived ? '' : ` · ${due(trip)}`}</p>
+        <p className="trip__meta">{dates(trip)}{dueText ? ` · ${dueText}` : ''}</p>
       </div>
 
       {list.total > 0 && (
@@ -96,7 +105,7 @@ export default function TripDetail({ tripId }: { tripId?: string }) {
                 <li key={item.id}>
                   <button type="button" className={`trip-piece${packed ? ' trip-piece--packed' : ''}`} aria-pressed={packed}
                     aria-label={t(packed ? 'trips.piecePacked' : 'trips.pieceNotPacked', { name: item.name })}
-                    onClick={() => void updateTrip(trip.id, (cur) => togglePacked(cur, item.id, outfitsById, newId))}>
+                    onClick={() => void attempt('trip.pack', () => updateTrip(trip.id, (cur) => togglePacked(cur, item.id, outfitsById, newId)), t('state.saveFailed'))}>
                     <span className="trip-piece__img"><PieceImg item={item} size={44} /></span>
                     <span className="trip-piece__name">{nbHyphen(item.name)}</span>
                     {packed && <span className={`trip-piece__stamp${t('trips.stamp').length > 7 ? ' trip-piece__stamp--long' : ''}`} style={{ transform: `translateX(-50%) rotate(${STAMP_TILTS[i % 5]}deg)` }} aria-hidden="true">{t('trips.stamp')}</span>}
@@ -124,7 +133,7 @@ export default function TripDetail({ tripId }: { tripId?: string }) {
               <button type="button" className="list-row" onClick={() => setPanel('edit')}>
                 <Icon name="calendar" />{t('trips.edit')}
               </button>
-              <button type="button" className="list-row" onClick={() => { void updateTrip(trip.id, (cur) => ({ ...cur, archived: !cur.archived })); setPanel(undefined); }}>
+              <button type="button" className="list-row" onClick={() => { void archive.run(trip.id); setPanel(undefined); }}>
                 <Icon name="check" />{trip.archived ? t('trips.unarchive') : t('trips.archive')}
               </button>
               <button type="button" className="list-row life-menu__danger" onClick={() => setPanel('delete')}>
@@ -136,8 +145,8 @@ export default function TripDetail({ tripId }: { tripId?: string }) {
       )}
       {panel === 'edit' && <TripForm trip={trip} onClose={() => setPanel(undefined)} onDone={() => setPanel(undefined)} />}
       {panel === 'delete' && (
-        <ConfirmSheet title={t('trips.delete')} text={t('trips.deleteConfirm', { name: trip.name })} confirm={t('action.delete')} danger
-          onClose={() => setPanel(undefined)} onConfirm={() => void db.trips.delete(trip.id).then(() => goBack('/trips'))} />
+        <ConfirmSheet title={t('trips.delete')} text={t('trips.deleteConfirm', { name: trip.name })} confirm={t('action.delete')} danger busy={remove.busy}
+          onClose={() => setPanel(undefined)} onConfirm={() => void remove.run(trip.id)} />
       )}
     </div>
   );
@@ -146,7 +155,7 @@ export default function TripDetail({ tripId }: { tripId?: string }) {
 function OutfitPicker({ trip, outfits, outfitsById, onClose }: { trip: Trip; outfits: Outfit[]; outfitsById: Map<string, Outfit>; onClose: () => void }) {
   const { t } = useI18n();
   const on = new Set(tripOutfitIds(trip));
-  const toggle = (o: Outfit) => updateTrip(trip.id, (cur) => setTripOutfit(cur, o.id, !tripOutfitIds(cur).includes(o.id), outfitsById, newId));
+  const toggle = (o: Outfit) => attempt('trip.outfit', () => updateTrip(trip.id, (cur) => setTripOutfit(cur, o.id, !tripOutfitIds(cur).includes(o.id), outfitsById, newId)), t('state.saveFailed'));
   return (
     <Sheet onClose={onClose} label={t('trips.pickOutfits')}>
       <div className="life-sheet">
@@ -173,30 +182,47 @@ function OutfitPicker({ trip, outfits, outfitsById, onClose }: { trip: Trip; out
 function PiecePicker({ trip, outfitsById, onClose }: { trip: Trip; outfitsById: Map<string, Outfit>; onClose: () => void }) {
   const { t } = useI18n();
   const active = useActiveItems();
+  const [query, setQuery] = useState('');
   const fromOutfits = outfitPieceIds(trip, outfitsById);
   const singles = new Set(trip.entries.filter((e) => e.kind === 'item').map((e) => e.refId));
-  const sorted = [...(active ?? [])].sort(byCategory);
-  const toggle = (item: Item) => updateTrip(trip.id, (cur) => setTripItem(cur, item.id, !cur.entries.some((e) => e.kind === 'item' && e.refId === item.id), newId));
+  const toggle = (item: Item) => attempt('trip.piece', () => updateTrip(trip.id, (cur) => setTripItem(cur, item.id, !cur.entries.some((e) => e.kind === 'item' && e.refId === item.id), newId)), t('state.saveFailed'));
+  // Under category headings, narrowed by what is typed in the filter (bug-audit #33).
+  const q = query.trim().toLocaleLowerCase();
+  const groups: [CategoryId, Item[]][] = [];
+  for (const item of [...(active ?? [])].sort(byCategory)) {
+    if (q && !item.name.toLocaleLowerCase().includes(q) && !t(`cat.${item.category}`).toLocaleLowerCase().includes(q)) continue;
+    const last = groups[groups.length - 1];
+    if (last?.[0] === item.category) last[1].push(item);
+    else groups.push([item.category, [item]]);
+  }
   return (
     <Sheet onClose={onClose} label={t('trips.pickPieces')}>
       <div className="life-sheet">
         <SheetHead title={t('trips.pickPieces')} onClose={onClose} />
-        <ul className="picker picker--pieces">
-          {sorted.map((item) => {
-            const locked = fromOutfits.has(item.id);
-            const on = locked || singles.has(item.id);
-            return (
-              <li key={item.id}>
-                <button type="button" className="picker__cell" aria-pressed={on} disabled={locked} onClick={() => void toggle(item)}>
-                  <span className="picker__img"><PieceImg item={item} size={44} /></span>
-                  <span className="picker__name">{nbHyphen(item.name)}</span>
-                  {locked && <span className="picker__sub">{t('trips.inOutfit')}</span>}
-                  {on && <span className="picker__check" aria-hidden="true"><Icon name="check" size={16} strokeWidth={2.4} /></span>}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <input className="input" type="search" value={query} onChange={(e) => setQuery(e.target.value)} enterKeyHint="search"
+          placeholder={t('trips.findPiece')} aria-label={t('trips.findPiece')} />
+        {groups.length === 0 && <p className="body life-muted">{t('trips.noPieceMatch')}</p>}
+        {groups.map(([cat, list]) => (
+          <section key={cat} className="stack gap-8" aria-label={t(`cat.${cat}`)}>
+            <h3 className="title-card">{t(`cat.${cat}`)}</h3>
+            <ul className="picker picker--pieces">
+              {list.map((item) => {
+                const locked = fromOutfits.has(item.id);
+                const on = locked || singles.has(item.id);
+                return (
+                  <li key={item.id}>
+                    <button type="button" className="picker__cell" aria-pressed={on} disabled={locked} onClick={() => void toggle(item)}>
+                      <span className="picker__img"><PieceImg item={item} size={44} /></span>
+                      <span className="picker__name">{nbHyphen(item.name)}</span>
+                      {locked && <span className="picker__sub">{t('trips.inOutfit')}</span>}
+                      {on && <span className="picker__check" aria-hidden="true"><Icon name="check" size={16} strokeWidth={2.4} /></span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
         <button type="button" className="btn btn--primary btn--block" onClick={onClose}>{t('action.done')}</button>
       </div>
     </Sheet>
