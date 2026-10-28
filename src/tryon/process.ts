@@ -1,12 +1,12 @@
 // Body photo → canonical body record (try-on §2.2): key points and person mask from the AI module, the pose check,
 // then the photo straightened and scaled onto the 1000 × 2000 canvas, cut out, measured and stored.
-import { detectPose, PoseError } from '../ai';
+import { cutOutBody, detectPose, PoseError, releaseAiWhenIdle } from '../ai';
 import { db, inMemory, withReopen } from '../data/db';
 import { describeError, record } from '../diag/diagnostics';
 import type { BodyRecord, Landmark } from '../domain/types';
 import { canonicalLandmarks, canonicalTransform, checkPose, bodyMetrics, metricsToRecord, CANON, LM, type PoseIssue } from './body';
 import { ctx2d, makeCanvas, maskFromImageData } from './assets';
-import { maskBounds } from './raster';
+import { keepNear, maskArea, maskBounds, resampleMask, type Mask } from './raster';
 import { downscaleToJpeg } from '../wardrobe/images';
 
 const toBlob = async (c: HTMLCanvasElement | OffscreenCanvas, type = 'image/png'): Promise<Blob> =>
@@ -36,13 +36,16 @@ export async function processBodyPhoto(photo: Blob): Promise<{ body?: BodyRecord
   const lms: Landmark[] = pose.landmarks ?? [];
   const W = pose.width;
   const H = pose.height;
-  const photoMask = maskFromImageData(pose.mask);
-  const mb = maskBounds(photoMask);
-  const sx = W / photoMask.width;
-  const sy = H / photoMask.height;
+  // The check uses MediaPipe's coarse person mask; the sharp one is made only for a photo that passes (D61).
+  const coarseMask = maskFromImageData(pose.mask);
+  const mb = maskBounds(coarseMask);
+  const sx = W / coarseMask.width;
+  const sy = H / coarseMask.height;
   const bounds = mb ? { x0: mb.x0 * sx, y0: mb.y0 * sy, x1: (mb.x1 + 1) * sx - 1, y1: (mb.y1 + 1) * sy - 1 } : undefined;
   const issues = lms.length < 33 || !mb ? [{ code: 'visibility' as const, detail: 'body' }] : checkPose(lms, { width: W, height: H }, bounds);
   if (lms.length < 33 || !mb || CORE.some((i) => (lms[i].visibility ?? 1) < 0.3)) return { issues };
+
+  const photoMask = await personMask(photo, coarseMask, W, H);
 
   const m = canonicalTransform(lms, W, H, photoMask);
   const landmarks = canonicalLandmarks(lms, W, H, m);
@@ -92,6 +95,27 @@ export async function processBodyPhoto(photo: Blob): Promise<{ body?: BodyRecord
     createdAt: Date.now(),
   };
   return { body, issues };
+}
+
+/**
+ * The person mask (D61): the cut-out model's sharp edges, kept only near MediaPipe's coarse person mask so other
+ * objects in the room drop out. MediaPipe's own mask when the model isn't on the phone, fails, or misses part of
+ * the person (less than 70 % of MediaPipe's area).
+ */
+async function personMask(photo: Blob, coarse: Mask, W: number, H: number): Promise<Mask> {
+  const cut = await cutOutBody(photo).catch((err) => { record('body.cutout.failed', describeError(err)); return null; });
+  void releaseAiWhenIdle();
+  if (!cut?.crop) return coarse;
+  const s = Math.min(1, 1024 / Math.max(W, H));
+  const c = makeCanvas(Math.round(W * s), Math.round(H * s));
+  const g = ctx2d(c);
+  const bitmap = await createImageBitmap(cut.cutout);
+  g.drawImage(bitmap, cut.crop.x * s, cut.crop.y * s, cut.crop.w * s, cut.crop.h * s);
+  bitmap.close?.();
+  const sharp = keepNear(maskFromImageData(g.getImageData(0, 0, c.width, c.height)), coarse, Math.round(coarse.height * 0.04));
+  const used = maskArea(sharp) >= 0.7 * maskArea(resampleMask(coarse, c.width, c.height));
+  record('body.cutout', { model: cut.model, used, ms: cut.ms });
+  return used ? sharp : coarse;
 }
 
 /** Stores the body record (the user accepted it on the Check screen). Garment fits refit automatically (try-on §5). */

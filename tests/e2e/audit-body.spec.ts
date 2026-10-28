@@ -1,6 +1,7 @@
 // The owner's bug and the body-photo flow (docs/bug-audit.md). WebKit, iPhone 15 Pro, synthetic figure (R2).
 import { expect, test } from './fixtures';
-import { bodyFile, failWrites, fakeDevice, openApp, withDb } from './helpers';
+import { bodyFile, failWrites, fakeDevice, modelMirror, openApp, withDb } from './helpers';
+import { MODEL_SPECS, hfUrl } from '../../src/ai/registry';
 
 const lost = () => new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError');
 
@@ -227,3 +228,23 @@ test.describe('found on the phone after the audit', () => {
     expect([...hosts].filter((h) => h && !h.startsWith('localhost') && !h.endsWith('.sentry.io'))).toEqual([]);
   });
 });
+
+test('D61 the body silhouette comes from the cut-out model when it is on the phone', async ({ context, page }) => {
+  test.setTimeout(180_000);
+  await fakeDevice(context);
+  if (!(await modelMirror(context))) test.skip(true, 'IMQ_MODEL_MIRROR is not set');
+  await openApp(page, { onboarded: false, route: '/body?onboarding=1' });
+  // ORMBG on the phone, as after onboarding: its files, from the mirror, in the app's model cache.
+  const ormbg = MODEL_SPECS.find((m) => m.id === 'ormbg')!;
+  const files = Object.values(ormbg.files!).flatMap((f) => Object.keys(f)).map((f) => hfUrl(ormbg.source, f));
+  await page.evaluate(async (urls) => {
+    const c = await caches.open('transformers-cache');
+    for (const u of urls) await c.put(u, await fetch(u));
+  }, [...new Set(files)]);
+  await page.locator('input[type=file]:not([capture])').setInputFiles(await bodyFile(page, 'good'));
+  await expect(page.getByRole('heading', { name: 'Check your points' })).toBeVisible({ timeout: 150_000 });
+  expect(await page.evaluate(() => localStorage.getItem('imq-bb-log') ?? '')).toMatch(/"s":"body\.cutout","d":\{"model":"ormbg","used":true/);
+  await page.getByRole('button', { name: 'Use this photo' }).click();
+  await expect(page).toHaveURL(/#\/dressup/);
+});
+

@@ -48,7 +48,7 @@ Every model is chosen by calibration (D12). The candidates below are what the Mo
 | Task | Used for | Candidates ⚑ | Fallback |
 |---|---|---|---|
 | Garment background removal | F2, F4 | **ORMBG, the default** (Apache-2.0, `onnx-community/ormbg-ONNX`, IS-Net architecture, 84 / 168 MB; D51), BiRefNet-lite (MIT, `onnx-community/BiRefNet_lite-ONNX`, 109 MB WebGPU / 214 MB WASM; grew to about 4 GB on WebGPU in the bug audit). On GPUs that allow only 10 storage buffers per shader (desktop Chrome), BiRefNet-lite can't run, and the app falls back to ORMBG | **Plain-background fast path in code:** sample the border colour and flood-fill by colour distance. Used when the background is clean, and as a quick preview |
-| Body cut-out | F1 | MediaPipe Pose Landmarker segmentation mask (Apache-2.0), MediaPipe multiclass selfie segmenter (Apache-2.0), BiRefNet (MIT) | Retake guide |
+| Body cut-out | F1 | **The garment cut-out model (ORMBG by default) draws the edges, kept only near MediaPipe Pose's person mask** so other objects in the room drop out (D61). Only a model already on the phone is used | MediaPipe's own mask when the model isn't downloaded, fails, or covers less than 70 % of MediaPipe's area; then the retake guide |
 | Body key points | F1, try-on | MediaPipe Pose Landmarker lite / full / heavy (Apache-2.0) | Drag the key points by hand on the Check screen |
 | Category, seasons | F3 | Zero-shot image–text models: CLIP ViT-B/32 (MIT, `Xenova/clip-vit-base-patch32`, 122 / 149 MB, default), FashionCLIP (MIT, `rshelby17/fashion-clip-onnx`, 228 MB) | The user picks |
 | Colours | F3 | **Plain code:** cluster the cut-out's pixels (k-means) and map them to a named palette | n/a |
@@ -137,7 +137,7 @@ CalibrationRun { id, task, modelId, photos: number, msPerPhoto, editedRate, devi
 | Weather (Open-Meteo) | **Only when the user switches the weather hint on** (D25) | A location rounded to about 10 km (Q2) |
 | Crash reports (Sentry, EU) | When something fails, while Settings → Crash reports is on (default, D50) | Technical data only (§12) |
 
-There are no analytics and no fonts from a CDN.
+There are no analytics and no fonts from a CDN. `@mediapipe/tasks-vision` posts usage logs to `odml.pa.googleapis.com` from every task, with no switch; the app answers that address itself before MediaPipe loads, and an e2e test fails on any request to a host outside this table (bug audit #52).
 
 ## 10. Testing
 

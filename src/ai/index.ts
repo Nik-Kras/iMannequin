@@ -122,6 +122,22 @@ async function cutOut(photo: Blob, opts?: { model?: string }): Promise<CutoutRes
   throw lastErr ?? noGarment();
 }
 
+/**
+ * The body photo through the garment cut-out model, for a sharp silhouette (D61): the chosen model, else ORMBG, and
+ * only one that is already on the phone, so the body step never starts a download. Null when there is none.
+ */
+export function cutOutBody(photo: Blob): Promise<CutoutResult | null> {
+  return exclusive(async () => {
+    const chosen = chosenModel(await getSettings(), 'cutout');
+    const ids = [...new Set([chosen.runtime === 'code' ? 'ormbg' : chosen.id, 'ormbg'])];
+    for (const id of ids) {
+      const s = specOf(id);
+      if (s && (await isDownloaded(id)) && !(await unusableHere(s))) return cutOut(photo, { model: id });
+    }
+    return null;
+  });
+}
+
 /** Category (top-3), colours, seasons and an image embedding for a cut-out. */
 export function analyseGarment(cutout: Blob): Promise<GarmentAnalysis> {
   return exclusive(() => analyse(cutout));

@@ -267,3 +267,37 @@ export function resampleMask(mask: Mask, width: number, height: number): Mask {
   }
   return out;
 }
+
+/** Grows the set pixels (> 127) by `r` pixels in every direction: a square max filter, one pass per axis. */
+export function dilateMask(mask: Mask, r: number): Mask {
+  const { width: w, height: h } = mask;
+  // Along one line of `n` cells: set every cell within r of a set cell, sweeping forwards then backwards.
+  const grow = (n: number, at: (i: number) => number, set: (i: number) => void) => {
+    for (let i = 0, seen = -Infinity; i < n; i++) { if (at(i) > 127) seen = i; if (i - seen <= r) set(i); }
+    for (let i = n - 1, seen = Infinity; i >= 0; i--) { if (at(i) > 127) seen = i; if (seen - i <= r) set(i); }
+  };
+  const rows = emptyMask(w, h);
+  for (let y = 0; y < h; y++) grow(w, (x) => mask.data[y * w + x], (x) => { rows.data[y * w + x] = 255; });
+  const out = emptyMask(w, h);
+  for (let x = 0; x < w; x++) grow(h, (y) => rows.data[y * w + x], (y) => { out.data[y * w + x] = 255; });
+  return out;
+}
+
+/**
+ * A sharp mask from a cut-out model, kept only near a coarse mask of the same subject (any size): the cut-out model
+ * draws the edges, the coarse mask says which object is the person, so a towel or a door it also found is dropped.
+ * `reach` is in coarse-mask pixels.
+ */
+export function keepNear(fine: Mask, coarse: Mask, reach: number): Mask {
+  const near = resampleMask(dilateMask(coarse, reach), fine.width, fine.height);
+  const out = emptyMask(fine.width, fine.height);
+  for (let i = 0; i < out.data.length; i++) out.data[i] = near.data[i] > 127 ? fine.data[i] : 0;
+  return out;
+}
+
+/** Pixels set (> 127). */
+export function maskArea(mask: Mask): number {
+  let n = 0;
+  for (let i = 0; i < mask.data.length; i++) if (mask.data[i] > 127) n++;
+  return n;
+}
