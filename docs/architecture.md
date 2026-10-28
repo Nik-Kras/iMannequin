@@ -31,7 +31,11 @@ Legend: **Decided** = approved by the owner · **Proposed ⚑** = Claude's recom
 
 - AI work runs in a **Web Worker**, so the UI stays smooth. If a library can't run in a worker on a platform, it runs on the main thread between frames ⚑.
 - **One model in memory at a time**, released after use. iPhone Safari kills pages that use too much memory.
-- A **processing queue** in IndexedDB survives the app being closed. iPhone suspends web apps in the background, so the queue resumes when the app is opened and shows "N left".
+  - A worker that has run a model on **WebGPU is never terminated**: in WebKit that crashes the page, even after its sessions are disposed. It disposes its model and loads the next one itself. A WebAssembly worker is disposed, then terminated, which is the only way to give its memory back (bug audit #6).
+  - The queue works in **batches of up to 10**: every waiting photo is cut out (the cut-out is stored), then all are analysed, so each model loads once per batch. Models are released when the queue is empty (#8).
+  - CLIP's text half runs once per phone; its prompt embeddings are cached (#8).
+  - The search language model runs only when the user taps "Search smarter", only on WebGPU, and is released right after (D56).
+- A **processing queue** in IndexedDB survives the app being closed. A photo's bytes are written once, to their own table, and never rewritten: WebKit can lose a Blob when the record that holds it is rewritten (bug audit #1). Every write that rewrites a Blob-holding record copies its Blobs into memory first (`withFreshBlobs`). iPhone suspends web apps in the background, so the queue resumes when the app is opened and shows "N left".
 - Image sizes ⚑:
   - originals downscaled to a 2048 px long edge (JPEG)
   - cut-outs at 1024 px (PNG with transparency)
@@ -43,7 +47,7 @@ Every model is chosen by calibration (D12). The candidates below are what the Mo
 
 | Task | Used for | Candidates ⚑ | Fallback |
 |---|---|---|---|
-| Garment background removal | F2, F4 | BiRefNet-lite (MIT, `onnx-community/BiRefNet_lite-ONNX`, 109 MB WebGPU / 214 MB WASM), ORMBG ⚑ (Apache-2.0, `onnx-community/ormbg-ONNX`, IS-Net architecture, 84 / 168 MB). On GPUs that allow only 10 storage buffers per shader (desktop Chrome), BiRefNet-lite can't run, and the app falls back to ORMBG | **Plain-background fast path in code:** sample the border colour and flood-fill by colour distance. Used when the background is clean, and as a quick preview |
+| Garment background removal | F2, F4 | **ORMBG, the default** (Apache-2.0, `onnx-community/ormbg-ONNX`, IS-Net architecture, 84 / 168 MB; D51), BiRefNet-lite (MIT, `onnx-community/BiRefNet_lite-ONNX`, 109 MB WebGPU / 214 MB WASM; grew to about 4 GB on WebGPU in the bug audit). On GPUs that allow only 10 storage buffers per shader (desktop Chrome), BiRefNet-lite can't run, and the app falls back to ORMBG | **Plain-background fast path in code:** sample the border colour and flood-fill by colour distance. Used when the background is clean, and as a quick preview |
 | Body cut-out | F1 | MediaPipe Pose Landmarker segmentation mask (Apache-2.0), MediaPipe multiclass selfie segmenter (Apache-2.0), BiRefNet (MIT) | Retake guide |
 | Body key points | F1, try-on | MediaPipe Pose Landmarker lite / full / heavy (Apache-2.0) | Drag the key points by hand on the Check screen |
 | Category, seasons | F3 | Zero-shot image–text models: CLIP ViT-B/32 (MIT, `Xenova/clip-vit-base-patch32`, 122 / 149 MB, default), FashionCLIP (MIT, `rshelby17/fashion-clip-onnx`, 228 MB) | The user picks |
@@ -100,7 +104,9 @@ Outfit     { id, name, slots: Partial<Record<Slot, itemId>>, accessories: itemId
              toggles: { tuckIn: boolean, intoBoots: boolean }, createdAt }
 WearEntry  { id, date: 'YYYY-MM-DD', outfitId?, itemIds: string[] }
 Trip       { id, name, start, end, entries: { itemId | outfitId, packed: boolean }[], archived }
-QueueJob   { id, kind: 'garment' | 'body', photoBlob, state, error?, createdAt }
+QueueJob   { id, kind: 'garment', state, error?, errorCode?, itemId?, cut?, createdAt }   // database v3
+QueuePhoto { jobId, blob: Blob, preview: Blob }               // written once (bug audit #1)
+QueueCut   { jobId, cutout: Blob, width, height }            // the cut-out between the two batch passes
 Settings   { lang: 'en' | 'uk', mannequin: 'photo' | 'outline',
              weather: { enabled: boolean, lat?, lon? },
              models: Record<Task, ModelId>, notWornMonths: number, lastBackupAt? }
@@ -119,6 +125,8 @@ CalibrationRun { id, task, modelId, photos: number, msPerPhoto, editedRate, devi
   - `images/` (originals, cut-outs and the body photo)
 
   It's exported through the Web Share API (Files / Drive) or as a download, and restored with a file picker.
+- An image this phone can no longer read is **left out instead of failing the backup**, and Settings says how many photos were left out. Export gathers the zip in 16 MB parts; restore reads images as slices of the file (bug audit #5).
+- Restore keeps **this phone's** crash-report choice, weather location and models, and clears the queue and the anchors cache. The queue isn't part of the backup, so database v3 kept backup format version 1.
 
 ## 9. Network & privacy
 

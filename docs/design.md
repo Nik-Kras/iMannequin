@@ -12,6 +12,7 @@ colors:
   pencil: "#CFCAC1"
   rule: "#E4E0D8"
   dash: "#9E998F"
+  line: "#89847A"
   marker: "#B3261E"
 typography:
   headline:
@@ -287,7 +288,8 @@ A monochrome stationery palette: warm off-white paper, white sheets, near-black 
 - **Crumpled paper** (`paper`): the page ground, always with the crumple texture.
 - **Sheet** (`sheet`): cards, sheets, bars, the tab bar.
 - **Tissue** (`tissue`): insets inside a sheet: thumbnail wells, segmented-control tracks, input fills, unselected chips, the close button.
-- **Pencil** (`pencil`): borders of unselected option cards and chips, disabled borders.
+- **Line** (`line`, #89847A): the border of an unselected control: option cards, chips, the notes field, cells, progress tracks and dots. 3:1 or more on sheet, paper and tissue (WCAG 1.4.11; bug audit #45).
+- **Pencil** (`pencil`): disabled buttons (with graphite text) and other quiet borders that don't mark a control.
 - **Rule** (`rule`): hairline dividers between rows inside a card.
 - **Dash** (`dash`): dashed outlines of empty slots and "add" or "none" cards. Empty slots also carry a + icon and a label, so the dash is never the only cue.
 
@@ -320,6 +322,8 @@ A monochrome stationery palette: warm off-white paper, white sheets, near-black 
 
 ### Named Rules
 **The 12px Floor Rule.** No text is smaller than 12px. The only exception is the favicon-size logo tile, which is an image.
+
+**The Text Size Rule (D59).** The sizes above are at the phone's default text size. In CSS a text size is written as `calc(N * var(--t))`, where `--t` is one pixel of text: on an iPhone it follows iOS Text Size (the root font is `-apple-system-body`, 17px by default), elsewhere the browser's root size. Body text grows up to 200 %. `--t-title` (headlines) stops at 150 %. `--t-tight` (Dress-up, the tab bar, segmented controls and badges) stops at 125 %, and the Dress-up slot callouts stay at 100 %. A control that holds text uses `min-height`, never `height`, so a larger size grows it instead of cutting the text. Only the "iM" mark and the 120px countdown digit stay fixed.
 
 **The Pen Only Writes Rule.** Caveat is for words a person would write by hand: places, outfit names, stamps, notes. Never for buttons, titles, body text or numbers you need to read precisely.
 
@@ -380,7 +384,7 @@ Firm, inked, thumb-sized.
 
 ### Chips
 - **Filter and choice chips:** tissue fill, ink text, Onest 500, about 14.5px. Selected: ink fill, white text.
-- **Option chips in forms:** white with a 1.5px pencil border; selected is ink with a white label.
+- **Option chips in forms:** white with a 1.5px `line` border; selected is ink with a white label.
 - **Add chips:** transparent with a 1.5px dashed `dash` border ("+ Colour", "+ new place").
 - **Colour chips:** a 24px swatch of the garment colour with a 2px white ring, then the name.
 - **Suggested by AI:** a small filled four-point star (13–14px) sits next to any value the app pre-filled (R5). It means "you can change this", nothing else.
@@ -404,7 +408,7 @@ Firm, inked, thumb-sized.
 - **Corner Style:** 6px.
 - **Background:** sheet on paper; tissue wells inside.
 - **Shadow Strategy:** paper at rest; lifted when selected.
-- **Border:** none. Selected option cards get a 2px ink border; unselected ones a 1.5px pencil border.
+- **Border:** none. Selected option cards get a 2px ink border; unselected ones a 1.5px `line` border.
 - **Internal Padding:** 16px; garment cards in the clothes row 7px.
 - **Garment card:** white card, a tissue well with the cut-out, the name in 12px under it. Selected: 2px ink ring, lifted shadow, raised 3px.
 - **Hero fields:** carbon black paper with white Prata titles and on-carbon-2 text.

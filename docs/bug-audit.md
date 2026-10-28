@@ -295,4 +295,74 @@ Everything is synthetic (R2): garments are the design canvas's paper shapes, the
 
 ## Status
 
-Fixing in progress. Every item gets a test named after its number (`#N`) that fails on the old code and passes on the fixed code.
+**All 50 items are fixed (2026-10-28)**, two of them only in part: #9 and #40. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
+
+**How it was fixed.** Four agents worked in parallel, each in its own git worktree and owning a set of files:
+- data, AI and memory;
+- body photo and Dress-up;
+- adding and reviewing clothes;
+- app shell, outfits, trips and settings.
+
+Each one:
+1. wrote the `#N` tests first;
+2. ran them against a build of the unfixed code;
+3. fixed the cause;
+4. reran its tests and everyone else's.
+
+The branches were merged one after another; #38 (text size) came last, because it touches every stylesheet.
+
+**Proof that the tests catch the bugs.** Every new end-to-end test was run against the build that was on the phone (e954c91):
+
+| Tests | Run on e954c91 | Failed there | Passed there, as expected |
+|---|---|---|---|
+| Body photo and Dress-up, shell and life screens | 98 | 94 | #0 ×2 (the hardening already deployed with D50), and #23 and #24, regression guards for behaviour that already worked |
+| Data, AI and memory (real models) | 8 | 8, including the page crash of #6 | none |
+| Adding and reviewing clothes | 37 | 36 | #11 “one image URL per queued photo”. It failed on the agent's pre-fix build, whose strip code is the same, so its result on the old code depends on timing; the other #11 test shows the bug |
+| Text size (#38) | 4 | 3 | “nothing cut off at 200 %”: on the old code text never grows, so nothing can be cut off; it guards the fix |
+
+New unit tests cover the queue runner, worker lifecycle, backup, search, reminder rule, wear log and naming. Each of them failed on the old modules.
+
+**Changed from the plan:**
+- **#6.** Disposing the models before terminating a worker did not stop the crash. In WebKit, terminating any worker that has run a WebGPU session kills the page about 1.5 s later. That held even with the GPU device destroyed and a 2.5 s wait. So a WebGPU worker is never terminated; it disposes its sessions and is reused ([architecture §3](architecture.md#3-processing-model)).
+- **#11.** The job record no longer holds the photo. Screens read the queue only through `useQueueView()`, which joins the write-once photo table.
+
+**Partly fixed or left open:**
+- **#9.** The full-size photo is decoded once, to scale it to 2048 px. The 2048 px copy is still decoded twice, once for the pose and once for the cut-out, about 12 MB each. Merging them needs a change to the pose result.
+- **#40.** Dress-up slot names still stop at 2 lines, and the slot callouts don't grow with the text size. Open question Q19 proposes hiding the zone label when a garment is on.
+- **#23.** "+ New place" double-tapped from the item form didn't reproduce in WebKit. The shared form fix covers it, and "Add" in Places has a test.
+- Two items needed no change: #45 (the body step dots are all ink on step 3 of 3) and #50 (the "✓" in "Saved" is an icon, already hidden from VoiceOver).
+
+**Judgement calls.** These are logged as D51–D60 in [decisions](decisions.md), marked "owner to confirm":
+- ORMBG is the default cut-out model.
+- The body photo is scaled to 2048 px, and the check offers "Use anyway".
+- Reviewing clothes uses "Save and next".
+- The backup reminder comes from 10 items or 3 days after the first item.
+- Back closes an open sheet first, and the item form asks before discarding.
+- The search model runs only when you tap.
+- The wear log can be edited by day.
+- Dress-up gets a "Create your mannequin" card and handles small screens.
+- Text follows the phone's text size.
+- "Save to Photos" opens the share sheet, and the install guide explains that a tab and the app keep separate data.
+
+**Bugs found while fixing:**
+- The backup counted lost image files, not photos. One garment whose three images were lost read as "3 photos". It now counts records.
+- At 200 % text, buttons, segmented controls, the backup reminder and Dress-up overflowed. They are covered by #38.
+
+**Tested by mechanism only.** Desktop WebKit can't reproduce these, so the tests check how they work:
+- memory on a real iPhone (#6–#9; WebKit and Chromium figures are in the reports);
+- the keyboard (#32, via `visualViewport`);
+- VoiceOver (#43, focus and `inert`);
+- iOS Text Size (#38, via the root font size);
+- going to the background (#15, via `visibilitychange`);
+- pressed states (#48, via the `:active` rules).
+
+**Still to check on the phone:**
+- the body photo end to end;
+- a 10-garment batch with the real models (WebKit peaked at 1.9 GB, close to the iOS limit);
+- the share sheet's Save Image;
+- camera permission prompts;
+- the countdown tick;
+- VoiceOver;
+- Text Size.
+
+Any failure there reaches Sentry (D50).
