@@ -22,6 +22,8 @@ export function useRoute(): Route {
 
 export function navigate(path: string, opts?: { replace?: boolean }): void {
   const hash = '#' + path;
+  // A second tap on the same link must not stack the screen twice (bug-audit #23).
+  if (!opts?.replace && location.hash === hash) return;
   if (opts?.replace) history.replaceState(null, '', hash);
   else history.pushState(null, '', hash);
   current = read();

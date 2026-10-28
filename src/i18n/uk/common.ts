@@ -23,6 +23,8 @@ export default {
   'state.loading': 'Завантаження…',
   'state.empty': 'Тут поки порожньо',
   'state.error': 'Щось пішло не так.',
+  'state.saveFailed': 'Не вдалося зберегти. Спробуйте ще раз.',
+  'state.actionFailed': 'Не вийшло. Спробуйте ще раз.',
   'ai.suggested': 'Запропонував ШІ',
   'update.ready': 'Готова нова версія.',
   'update.reload': 'Оновити',

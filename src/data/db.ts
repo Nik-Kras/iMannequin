@@ -46,18 +46,45 @@ export const db = new IMannequinDB();
  * IndexedDB connection of a page that was in the background (the camera or photo picker was open):
  * "UnknownError: Connection to Indexed Database server lost".
  */
-export async function withReopen<T>(write: () => Promise<T>, onRetry?: (err: unknown) => void): Promise<T> {
+export async function withReopen<T>(write: () => Promise<T>, onRetry?: (err: unknown) => void, timeoutMs = WRITE_TIMEOUT_MS): Promise<T> {
   try {
-    return await write();
+    return await withTimeout(write(), timeoutMs);
   } catch (err) {
-    const name = (err as { name?: string })?.name ?? '';
-    const inner = (err as { inner?: { name?: string } })?.inner?.name ?? '';
-    if (![name, inner].some((n) => ['UnknownError', 'InvalidStateError', 'DatabaseClosedError'].includes(n))) throw err;
+    if (!isConnectionError(err)) throw err;
     onRetry?.(err);
     db.close({ disableAutoOpen: false });
     await db.open();
-    return write();
+    return withTimeout(write(), timeoutMs);
   }
+}
+
+/** A write that hasn't settled after this long is treated as a lost connection (iOS can leave it hanging). */
+export const WRITE_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  if (!ms) return p;
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new DOMException('IndexedDB did not answer in time', 'UnknownError')), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
+
+/** Errors that mean the database connection is gone (worth one reopen and retry). */
+export function isConnectionError(err: unknown): boolean {
+  const name = (err as { name?: string })?.name ?? '';
+  const inner = (err as { inner?: { name?: string } })?.inner?.name ?? '';
+  return [name, inner].some((n) => ['UnknownError', 'InvalidStateError', 'DatabaseClosedError'].includes(n));
+}
+
+/**
+ * A record with every Blob field replaced by an in-memory copy. Rewrite Blob-holding records only like this:
+ * on WebKit, storing a record whose Blobs are handles read from IndexedDB can leave them dead (bug-audit #2).
+ */
+export async function withFreshBlobs<T extends object>(record: T): Promise<T> {
+  const out = { ...record } as Record<string, unknown>;
+  for (const [k, v] of Object.entries(out)) if (v instanceof Blob) out[k] = await inMemory(v);
+  return out as T;
 }
 
 /** Copies a Blob's bytes into memory. WebKit can fail to store a Blob backed by a picked file or a canvas. */
@@ -93,9 +120,12 @@ export async function getSettings(): Promise<AppSettings> {
   return fresh;
 }
 
+/** Read and write in one transaction, so quick taps never overwrite each other (bug-audit #23). */
 export async function updateSettings(patch: Partial<AppSettings>): Promise<void> {
-  const s = await getSettings();
-  await db.settings.put({ ...s, ...patch, id: 'app' });
+  await db.transaction('rw', db.settings, async () => {
+    const s = await getSettings();
+    await db.settings.put({ ...s, ...patch, id: 'app' });
+  });
 }
 
 /** Default storage places created on first run (D22); the user renames or adds more. */

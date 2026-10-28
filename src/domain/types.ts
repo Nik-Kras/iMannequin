@@ -146,12 +146,16 @@ export interface TripEntry { id: string; kind: 'item' | 'outfit'; refId: string;
 export interface Trip { id: string; name: string; start: string; end: string; entries: TripEntry[]; archived: boolean; createdAt: number }
 
 export type QueueState = 'waiting' | 'working' | 'done' | 'failed';
+/** Why a queue job failed; the review inbox shows a message and an action for each (bug-audit #16). */
+export type QueueError = 'no-garment' | 'models' | 'network' | 'storage' | 'photo-lost' | 'unreadable' | 'other';
+
 export interface QueueJob {
   id: string;
   kind: 'garment';
   blob: Blob;
   state: QueueState;
   error?: string;
+  errorCode?: QueueError;
   itemId?: string;
   createdAt: number;
 }

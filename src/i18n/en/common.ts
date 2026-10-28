@@ -22,6 +22,8 @@ export default {
   'state.loading': 'Loading…',
   'state.empty': 'Nothing here yet',
   'state.error': 'Something went wrong.',
+  'state.saveFailed': 'Couldn’t save. Try again.',
+  'state.actionFailed': 'That didn’t work. Try again.',
   'ai.suggested': 'Suggested by AI',
   'update.ready': 'A new version is ready.',
   'update.reload': 'Reload',

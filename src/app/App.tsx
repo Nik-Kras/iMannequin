@@ -6,6 +6,7 @@ import { getSettings } from '../data/db';
 import { startQueueRunner } from '../data/queue';
 import { record, setDiagnosticsEnabled, startDiagnostics } from '../diag/diagnostics';
 import { Toast } from '../ui/parts';
+import { dismissNotice, useNotices } from '../ui/action';
 import { TabBar } from './TabBar';
 import { navigate, useRoute, TAB_ROOTS } from './router';
 import DressUp from '../screens/DressUp';
@@ -99,6 +100,7 @@ function Shell() {
       <main key={route.path}><Screen parts={route.parts} /></main>
       {settings.onboarded && <BackupReminder />}
       {showTabs && <TabBar current={route.path} />}
+      <Notices />
       {needRefresh && (
         <Toast onDone={() => setNeedRefresh(false)} ms={60_000}
           action={<button type="button" className="text-action" onClick={() => updateServiceWorker(true)}>{t('update.reload')}</button>}>
@@ -106,6 +108,19 @@ function Shell() {
         </Toast>
       )}
     </>
+  );
+}
+
+/** App-wide messages from useAction / notify (failed saves with Retry). */
+function Notices() {
+  const list = useNotices();
+  const n = list[list.length - 1];
+  if (!n) return null;
+  return (
+    <Toast key={n.id} onDone={() => dismissNotice(n.id)} ms={n.ms}
+      action={n.action && n.actionLabel ? <button type="button" className="text-action" onClick={() => { dismissNotice(n.id); n.action!(); }}>{n.actionLabel}</button> : undefined}>
+      {n.text}
+    </Toast>
   );
 }
 

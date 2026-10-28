@@ -19,6 +19,8 @@
   --pencil: #cfcac1;
   --rule: #e4e0d8;
   --dash: #9e998f;
+  /* Boundary of an unselected control: 3:1 or more on white, paper and tissue (bug-audit #45). */
+  --line: #89847a;
   --marker: #b3261e;
   --switch-off: #8f8a80;
 

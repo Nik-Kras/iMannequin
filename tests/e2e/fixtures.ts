@@ -10,7 +10,7 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
     const dir = mkdtempSync(join(tmpdir(), 'imannequin-e2e-'));
     const ctx = await webkit.launchPersistentContext(dir, {
       ...devices['iPhone 15 Pro'],
-      baseURL: 'http://localhost:4183/iMannequin/',
+      baseURL: `http://localhost:${process.env.IMQ_PORT ?? '4183'}/iMannequin/`,
       locale: 'en-GB',
       timezoneId: 'Europe/London',
     });

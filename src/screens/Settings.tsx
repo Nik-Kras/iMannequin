@@ -2,7 +2,7 @@
 import '../styles/life.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, updateSettings } from '../data/db';
+import { db, updateSettings, withFreshBlobs } from '../data/db';
 import { useLocations, useSettings } from '../data/repo';
 import { applyBackup, BackupError, BACKUP_MIME, backupFileName, exportBackup, readBackup, type ParsedBackup } from '../data/backup';
 import { requestRoundedLocation, useWeather } from '../data/weather';
@@ -167,7 +167,7 @@ export default function Settings() {
   const deleteOriginal = async () => {
     // D48: the original photo goes; the cut-out and mask stay, so the mannequin keeps working.
     const b = await db.body.get('current');
-    if (b) await db.body.put({ ...b, photo: new Blob([], { type: b.photo.type }) });
+    if (b) await db.body.put(await withFreshBlobs({ ...b, photo: new Blob([], { type: b.photo.type }) }));
     setPanel(undefined);
     setToast(t('settings.originalDeleted'));
   };
