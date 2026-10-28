@@ -8,7 +8,7 @@ import { useSettings } from '../data/repo';
 import { updateSettings } from '../data/db';
 import { Icon } from '../ui/icons';
 import { Stamp } from '../ui/parts';
-import { chosenModel, downloadModel, downloadSize, effectiveModel, isDownloaded, type ModelSpec } from '../ai';
+import { chosenModel, downloadModel, downloadSize, effectiveModel, remainingBytes, type ModelSpec } from '../ai';
 import { reportError } from '../diag/diagnostics';
 import { AiIcon, useSize } from '../ai/ui';
 
@@ -38,20 +38,25 @@ export default function ModelDownload() {
     if (!settings) return;
     let live = true;
     void (async () => {
-      const [c, k, q] = await Promise.all([effectiveModel(settings, 'cutout'), effectiveModel(settings, 'classify'), effectiveModel(settings, 'search')]);
-      const toFetch = [c, k];
-      const next: Record<string, RowState> = {};
-      for (const m of toFetch) {
-        const total = await downloadSize(m.id);
-        const ready = await isDownloaded(m.id);
-        next[m.id] = { done: ready ? total : 0, total, ready };
+      try {
+        const [c, k, q] = await Promise.all([effectiveModel(settings, 'cutout'), effectiveModel(settings, 'classify'), effectiveModel(settings, 'search')]);
+        const toFetch = [c, k];
+        const next: Record<string, RowState> = {};
+        for (const m of toFetch) {
+          // Files finished before a reload or a pause count as done (bug-audit #19).
+          const { total, remaining } = await remainingBytes([m.id]);
+          next[m.id] = { done: total - remaining, total, ready: remaining === 0 };
+        }
+        const sb = await downloadSize(q.id);
+        if (!live) return;
+        setPicked({ cutout: c, classify: k, search: q });
+        setRows(next);
+        setSearchBytes(sb);
+        setPhase(Object.values(next).every((r) => r.ready) ? 'done' : 'idle');
+      } catch (err) {
+        reportError(err, 'models.check');
+        if (live) setPhase('error');
       }
-      const sb = await downloadSize(q.id);
-      if (!live) return;
-      setPicked({ cutout: c, classify: k, search: q });
-      setRows(next);
-      setSearchBytes(sb);
-      setPhase(Object.values(next).every((r) => r.ready) ? 'done' : 'idle');
     })();
     return () => { live = false; };
   }, [choice, !!settings]);
@@ -59,7 +64,7 @@ export default function ModelDownload() {
   useEffect(() => () => abort.current?.abort(), []);
 
   useEffect(() => {
-    if (phase === 'done') void updateSettings({ modelsReady: true });
+    if (phase === 'done') updateSettings({ modelsReady: true }).catch((err) => reportError(err, 'models.ready'));
   }, [phase]);
 
   const total = Object.values(rows).reduce((a, r) => a + r.total, 0);
@@ -93,8 +98,8 @@ export default function ModelDownload() {
     const r = rows[m.id];
     if (!r) return '';
     if (r.ready) return phase === 'idle' ? size(r.total) : t('ai.dl.done');
-    if (phase === 'idle') return size(r.total);
     if (r.done > 0) return `${Math.floor((100 * r.done) / Math.max(1, r.total))}%`;
+    if (phase === 'idle') return size(r.total);
     return t('ai.dl.waiting');
   };
 

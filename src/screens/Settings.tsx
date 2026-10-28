@@ -7,6 +7,7 @@ import { useLocations, useSettings } from '../data/repo';
 import { applyBackup, BackupError, BACKUP_MIME, backupFileName, exportBackup, readBackup, type ParsedBackup } from '../data/backup';
 import { requestRoundedLocation, useWeather } from '../data/weather';
 import { MODELS } from '../ai';
+import { ModelsNeeded } from '../ai/ui';
 import { useI18n } from '../i18n';
 import { navigate, useRoute } from '../app/router';
 import { Header, ProgressBar, Segmented, Sheet, Switch, Toast } from '../ui/parts';
@@ -249,6 +250,7 @@ export default function Settings() {
               </div>
             ))}
           </dl>
+          <ModelsNeeded />
           <button type="button" className="btn btn--secondary btn--block btn--sm" onClick={() => navigate('/model-lab')}>
             <Icon name="flask" size={18} />{t('settings.modelLab')}
           </button>

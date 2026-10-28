@@ -73,6 +73,11 @@ export default {
   'ai.lab.results': 'Results from this run',
   'ai.lab.resultAlt': 'Cut-out by {model}',
 
+  // Add clothes and Settings while the models aren't on this phone (bug-audit #19)
+  'ai.needed.label': 'AI models not downloaded',
+  'ai.needed.text': 'The AI models that cut out and sort your clothes aren’t on this phone yet ({size}).',
+  'ai.needed.action': 'Download',
+
   // Backup export (bug-audit #5): exportBackupFile().skipped
   'ai.backup.skipped_one': '{n} photo couldn’t be read on this phone, so it isn’t in the backup.',
   'ai.backup.skipped_few': '{n} photos couldn’t be read on this phone, so they aren’t in the backup.',

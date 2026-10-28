@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test as base, devices, expect, webkit, type BrowserContext, type Page } from '@playwright/test';
-import { fakeDevice, garmentFile, modelMirror, openApp, withDb } from './helpers';
+import { failWrites, fakeDevice, garmentFile, modelMirror, openApp, withDb } from './helpers';
+import { MODEL_SPECS, hfUrl } from '../../src/ai/registry';
 
 type App = { context: BrowserContext; page: Page };
 type LaunchOpts = { stallWorker?: boolean; models?: 'none' | 'mirror' };
@@ -157,5 +158,61 @@ test.describe('#5 backup', () => {
     expect(await withDb(page, `return Object.keys(await db.photos.get('p-b')).filter((k) => ['original', 'cutout', 'thumb'].includes(k))`)).toEqual([]);
     expect(await withDb(page, `return await db.items.count()`)).toBe(2);
     expect(await deadBlobs(page)).toEqual([]);
+  });
+});
+
+/** Puts placeholder files in the model cache, as if they were downloaded (only their presence is checked). */
+async function cacheModelFiles(page: Page, urls: string[]) {
+  await page.evaluate(async (urls) => {
+    const c = await caches.open('transformers-cache');
+    for (const u of urls) await c.put(u, new Response('x', { headers: { 'content-length': '1' } }));
+  }, urls);
+}
+const filesOf = (id: string, match: RegExp = /./) => {
+  const s = MODEL_SPECS.find((m) => m.id === id)!;
+  return Object.values(s.files!).flatMap((f) => Object.keys(f)).filter((f) => match.test(f)).map((f) => hfUrl(s.source, f));
+};
+const downloadMb = async (page: Page) => Number((await page.getByRole('button', { name: /^Download \d/ }).textContent())!.replace(/\D+/g, ''));
+
+test.describe('#19 model download', () => {
+  test('#19 after a reload mid-download, the files already on the phone are counted', async ({ launch }) => {
+    const { page } = await launch();
+    await openApp(page, { route: '/models' });
+    const before = await downloadMb(page);
+    // The image half of CLIP finished before the app was closed (either device's file).
+    await cacheModelFiles(page, filesOf('clip-b32', /vision_model/));
+    await page.reload();
+    await expect.poll(() => downloadMb(page)).toBeLessThan(before - 40);
+  });
+
+  test('#19 Add clothes and Settings say when the models are missing, and lead to the download', async ({ launch }) => {
+    const { page } = await launch();
+    await openApp(page, { route: '/add' });
+    await page.getByRole('dialog').getByRole('button', { name: 'Continue' }).click(); // the first-visit guide
+    const banner = page.getByRole('region', { name: 'AI models not downloaded' });
+    await expect(banner).toContainText('aren’t on this phone yet');
+    await banner.getByRole('button', { name: 'Download' }).click();
+    await expect(page).toHaveURL(/#\/models/);
+
+    await page.goto('./?e2e#/settings');
+    await expect(page.getByRole('region', { name: 'AI models not downloaded' })).toBeVisible();
+
+    await cacheModelFiles(page, [...filesOf('ormbg'), ...filesOf('clip-b32')]);
+    await page.goto('./?e2e#/add');
+    await expect(page.locator('input[type=file][multiple]')).toHaveCount(1);
+    await page.waitForTimeout(1000);
+    await expect(page.getByRole('region', { name: 'AI models not downloaded' })).toHaveCount(0);
+  });
+});
+
+test.describe('#3 Model lab says when a tap didn\'t work', () => {
+  test('#3 choosing a model while the database can\'t be written shows an error instead of failing silently', async ({ launch }) => {
+    const { page } = await launch();
+    await openApp(page, { route: '/model-lab' });
+    const use = page.getByRole('button', { name: 'Use FashionCLIP for Clothing type and colour' });
+    await expect(use).toBeEnabled();
+    await failWrites(page, 'settings', 'put');
+    await use.click();
+    await expect(page.getByText('Couldn’t save. Try again.')).toBeVisible();
   });
 });

@@ -13,6 +13,7 @@ import { CutoutImg, Toast, useBlobUrl } from '../ui/parts';
 import { Icon } from '../ui/icons';
 import { captureFrame, downscaleToJpeg } from '../wardrobe/images';
 import { TitledSheet, XIcon } from '../wardrobe/parts';
+import { ModelsNeeded } from '../ai/ui';
 
 type CamState = 'starting' | 'live' | 'denied' | 'unavailable';
 const TIPS = ['wardrobe.add.tip.tops', 'wardrobe.add.tip.bottoms', 'wardrobe.add.tip.shoes'] as const;
@@ -107,6 +108,7 @@ export default function AddClothes() {
 
   return (
     <div className="wd-cam">
+      <ModelsNeeded where="camera" />
       <div className="wd-cam__view">
         <video ref={videoRef} className="wd-cam__video" playsInline muted autoPlay aria-hidden="true" hidden={cam !== 'live'} />
         {fallback && (

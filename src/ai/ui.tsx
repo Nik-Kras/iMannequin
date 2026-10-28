@@ -1,8 +1,15 @@
-// Small UI helpers for the AI screens (ModelDownload, ModelLab): extra icons and localised sizes.
-import { useCallback } from 'react';
+// Small UI helpers for the AI screens (ModelDownload, ModelLab): extra icons and localised sizes, and the
+// "models not downloaded" banner for Add clothes and Settings (bug-audit #19).
+import '../styles/ai.css';
+import { useCallback, useEffect, useState } from 'react';
 import type { SVGProps } from 'react';
 import { useI18n } from '../i18n';
 import { Icon, type IconName } from '../ui/icons';
+import { navigate } from '../app/router';
+import { useSettings } from '../data/repo';
+import { reportError } from '../diag/diagnostics';
+import { effectiveModel } from './embed';
+import { remainingBytes } from './downloads';
 
 const EXTRA = {
   tag: 'M3.5 12.5 11 5h7.5v7.5L11 20ZM15 8.5h.01',
@@ -33,4 +40,54 @@ export function useSize(): (bytes: number) => string {
     if (mb >= 1000) return t('ai.gb', { n: (mb / 1024).toLocaleString(locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }) });
     return t('ai.mb', { n: (bytes > 0 ? Math.max(1, Math.round(mb)) : 0).toLocaleString(locale) });
   }, [t, lang]);
+}
+
+export interface ModelsStatus {
+  /** Every file of the cut-out and classification models in use is on this phone. */
+  ready: boolean;
+  /** Bytes still to download for them. */
+  remaining: number;
+}
+
+/**
+ * Whether the models adding clothes needs are on this phone, read from the model cache itself (a flag in settings
+ * goes stale when a model is deleted or another one is chosen). Undefined while checking.
+ */
+export function useModelsStatus(): ModelsStatus | undefined {
+  const settings = useSettings();
+  const [status, setStatus] = useState<ModelsStatus>();
+  const choice = JSON.stringify(settings?.models ?? {});
+  useEffect(() => {
+    if (!settings) return;
+    let live = true;
+    void (async () => {
+      try {
+        const models = await Promise.all([effectiveModel(settings, 'cutout'), effectiveModel(settings, 'classify')]);
+        const { remaining } = await remainingBytes(models.map((m) => m.id));
+        if (live) setStatus({ ready: remaining === 0, remaining });
+      } catch (err) {
+        reportError(err, 'models.status');
+      }
+    })();
+    return () => { live = false; };
+  }, [choice, !!settings]);
+  return status;
+}
+
+/**
+ * Says the AI models aren't downloaded, with the way to get them (bug-audit #19). Renders nothing once they are.
+ * `camera`: floats on the Add clothes camera, under its top bar; `card`: a row inside a Settings card.
+ */
+export function ModelsNeeded({ where = 'card' }: { where?: 'camera' | 'card' }) {
+  const { t } = useI18n();
+  const size = useSize();
+  const status = useModelsStatus();
+  if (!status || status.ready) return null;
+  return (
+    <section className={`ai-needed ai-needed--${where}`} aria-label={t('ai.needed.label')}>
+      <AiIcon name="download" size={20} />
+      <p className="ai-needed__text">{t('ai.needed.text', { size: size(status.remaining) })}</p>
+      <button type="button" className="btn btn--primary btn--sm ai-needed__go" onClick={() => navigate('/models')}>{t('ai.needed.action')}</button>
+    </section>
+  );
 }

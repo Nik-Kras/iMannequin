@@ -13,6 +13,8 @@ import {
 } from '../ai';
 import { calibrate, calibrationPhotos, exportCalibration, SEARCH_TESTS, type CalibrationOutcome, type CalibrationStep } from '../ai/calibrate';
 import { AiIcon, useSize } from '../ai/ui';
+import { useAction } from '../ui/action';
+import { reportError } from '../diag/diagnostics';
 
 const TASKS: AiTask[] = ['cutout', 'classify', 'search', 'describe', 'pose'];
 
@@ -32,11 +34,15 @@ export default function ModelLab() {
 
   const [effective, setEffective] = useState<Partial<Record<AiTask, string>>>({});
   const refresh = useCallback(async () => {
-    const next: Record<string, ModelState> = {};
-    for (const s of MODEL_SPECS) {
-      next[s.id] = { downloaded: await isDownloaded(s.id), bytes: await downloadSize(s.id), unusable: await unusableHere(s) };
+    try {
+      const next: Record<string, ModelState> = {};
+      for (const s of MODEL_SPECS) {
+        next[s.id] = { downloaded: await isDownloaded(s.id), bytes: await downloadSize(s.id), unusable: await unusableHere(s) };
+      }
+      setStates(next);
+    } catch (err) {
+      reportError(err, 'lab.refresh');
     }
-    setStates(next);
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   const choice = JSON.stringify(settings?.models ?? {});
@@ -46,16 +52,25 @@ export default function ModelLab() {
       const e: Partial<Record<AiTask, string>> = {};
       for (const task of TASKS) e[task] = (await effectiveModel(settings, task)).id;
       setEffective(e);
-    })();
+    })().catch((err) => reportError(err, 'lab.effective'));
   }, [choice, states, !!settings]);
   useEffect(() => () => stopper.current?.abort(), []);
 
   const latest = latestByModel(runs ?? []);
   const lastBatch = lastRun(runs ?? []);
 
+  // Every handler reports a failure instead of leaving a silent rejection (bug-audit #3).
+  const failed = { errorText: t('state.actionFailed'), retryLabel: t('action.retry') };
+  const choose = useAction('lab.use', async (s: ModelSpec) => {
+    await updateSettings({ models: { ...(settings?.models ?? {}), [s.task]: s.id } });
+    return true;
+  }, { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
+  const removeAction = useAction('lab.delete', (s: ModelSpec) => remove(s), failed);
+  const resetAction = useAction('lab.reset', () => reset(), { errorText: t('state.saveFailed'), retryLabel: t('action.retry') });
+  const exportAction = useAction('lab.export', () => exportResults(), failed);
+
   async function use(s: ModelSpec) {
-    const current = settings?.models ?? {};
-    await updateSettings({ models: { ...current, [s.task]: s.id } });
+    if (!(await choose.run(s))) return;
     if (s.runtime === 'transformers' && !states[s.id]?.downloaded) await download(s);
   }
 
@@ -63,7 +78,8 @@ export default function ModelLab() {
     setBusy((b) => ({ ...b, [s.id]: 0 }));
     try {
       await downloadModel(s.id, (d, tot) => setBusy((b) => ({ ...b, [s.id]: d / Math.max(1, tot) })));
-    } catch {
+    } catch (err) {
+      reportError(err, 'lab.download');
       setMessage(t('ai.dl.failed'));
     } finally {
       setBusy(({ [s.id]: _, ...rest }) => rest);
@@ -73,21 +89,25 @@ export default function ModelLab() {
 
   async function remove(s: ModelSpec) {
     setBusy((b) => ({ ...b, [s.id]: 'deleting' }));
-    await deleteDownload(s.id);
-    setBusy(({ [s.id]: _, ...rest }) => rest);
-    await refresh();
+    try {
+      await deleteDownload(s.id);
+    } finally {
+      setBusy(({ [s.id]: _, ...rest }) => rest);
+      await refresh();
+    }
   }
 
   async function runCalibration() {
     setMessage(null);
-    if (!(await calibrationPhotos()).length) { setMessage(t('ai.lab.noPhotos')); return; }
     const ctl = new AbortController();
     stopper.current = ctl;
     setOutcome(null);
     try {
+      if (!(await calibrationPhotos()).length) { setMessage(t('ai.lab.noPhotos')); return; }
       setOutcome(await calibrate(setStep, ctl.signal));
-    } catch {
-      /* stopped, or a model crashed: the rows saved so far stay */
+    } catch (err) {
+      // Stopped, or a model crashed: the rows saved so far stay.
+      if (!ctl.signal.aborted) reportError(err, 'lab.calibrate');
     } finally {
       setStep(null);
       stopper.current = null;
@@ -229,7 +249,7 @@ export default function ModelLab() {
                     <div className="ai-model__extra">
                       <span className="meta">{where(s)}</span>
                       {s.runtime === 'transformers' && st?.downloaded && !running && (
-                        <button type="button" className="text-action" aria-label={t('ai.lab.deleteLabel', { model: s.label })} onClick={() => void remove(s)}>
+                        <button type="button" className="text-action" aria-label={t('ai.lab.deleteLabel', { model: s.label })} onClick={() => void removeAction.run(s)}>
                           <AiIcon name="trash" size={16} />{t('ai.lab.delete')}
                         </button>
                       )}
@@ -244,10 +264,10 @@ export default function ModelLab() {
 
       <div className="ai-lab__foot">
         <span className="meta">{t('ai.lab.footer')}</span>
-        <button type="button" className="text-action" onClick={() => void reset()} disabled={running}>{t('ai.lab.reset')}</button>
+        <button type="button" className="text-action" onClick={() => void resetAction.run()} disabled={running}>{t('ai.lab.reset')}</button>
       </div>
       <div className="ai-lab__export">
-        <button type="button" className="btn btn--secondary btn--block btn--sm" onClick={() => void exportResults()} disabled={!runs?.length}>
+        <button type="button" className="btn btn--secondary btn--block btn--sm" onClick={() => void exportAction.run()} disabled={!runs?.length}>
           <AiIcon name="share" size={18} />{t('ai.lab.export')}
         </button>
         <span className="meta">{t('ai.lab.exportNote')}</span>
