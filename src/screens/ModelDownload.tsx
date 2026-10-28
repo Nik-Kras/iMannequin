@@ -26,7 +26,7 @@ export default function ModelDownload() {
   const [searchBytes, setSearchBytes] = useState(0);
   const abort = useRef<AbortController | null>(null);
 
-  // The models this phone will really use (BiRefNet-lite needs WebGPU; without it the next candidate).
+  // The models this phone will really use (the chosen one, or the next candidate where it can't run).
   const [picked, setPicked] = useState<{ cutout: ModelSpec; classify: ModelSpec; search: ModelSpec } | null>(null);
   const cutout = picked?.cutout ?? chosenModel(settings, 'cutout');
   const classify = picked?.classify ?? chosenModel(settings, 'classify');

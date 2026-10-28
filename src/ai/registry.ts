@@ -41,11 +41,13 @@ export const MODEL_SPECS: ModelSpec[] = [
     note: 'Built in. Works when the background is one clean colour.',
   },
   {
-    id: 'birefnet-lite', task: 'cutout', label: 'BiRefNet-lite', licence: 'MIT', source: 'onnx-community/BiRefNet_lite-ONNX', default: true,
+    id: 'birefnet-lite', task: 'cutout', label: 'BiRefNet-lite', licence: 'MIT', source: 'onnx-community/BiRefNet_lite-ONNX',
     runtime: 'transformers', kind: 'segmentation',
     // Measured in Chrome 2026-10-28: on the CPU its fixed 1024 × 1024 input runs out of WebAssembly
     // memory (std::bad_alloc); on WebGPU one kernel needs 11 storage buffers per shader stage, more
     // than many GPUs allow (Chrome on a Mac: 10). Elsewhere the next candidate (ORMBG) is used.
+    // Not the default (bug-audit #7): in WebKit on WebGPU it grew from 612 MB to 4 GB and failed with bad_alloc,
+    // where an iPhone kills the tab at about 2 GB. It stays selectable in the Model lab.
     devices: ['webgpu'],
     minStorageBuffers: 11,
     dtype: { webgpu: 'fp16', wasm: 'fp32' },
@@ -56,8 +58,9 @@ export const MODEL_SPECS: ModelSpec[] = [
   },
   {
     // Replaces IS-Net: onnx-community/ISNet-ONNX is AGPL-3.0 on the Hub, which R3 rules out.
-    // ORMBG is an IS-Net (DIS) model under Apache-2.0 (schirrmacher/ormbg).
-    id: 'ormbg', task: 'cutout', label: 'ORMBG (IS-Net)', licence: 'Apache-2.0', source: 'onnx-community/ormbg-ONNX',
+    // ORMBG is an IS-Net (DIS) model under Apache-2.0 (schirrmacher/ormbg). The default since bug-audit #7:
+    // it peaks around 1.2 GB in WebKit on WebGPU.
+    id: 'ormbg', task: 'cutout', label: 'ORMBG (IS-Net)', licence: 'Apache-2.0', source: 'onnx-community/ormbg-ONNX', default: true,
     runtime: 'transformers', kind: 'segmentation',
     dtype: { webgpu: 'fp16', wasm: 'fp32' },
     files: {
@@ -157,7 +160,7 @@ export function chosenModel(settings: Pick<AppSettings, 'models'> | undefined, t
 }
 
 /** The models the first-run download fetches: the default cut-out and classification models. */
-export const ONBOARDING_MODELS = ['birefnet-lite', 'clip-b32'];
+export const ONBOARDING_MODELS = ['ormbg', 'clip-b32'];
 
 export function formatMb(bytes: number): string {
   const mb = bytes / MB;

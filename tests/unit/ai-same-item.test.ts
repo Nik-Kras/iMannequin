@@ -92,7 +92,7 @@ describe('model registry', () => {
   });
 
   it('defaults follow the brief and decisions', () => {
-    expect(defaultModel('cutout').id).toBe('birefnet-lite');
+    expect(defaultModel('cutout').id).toBe('ormbg'); // bug-audit #7
     expect(defaultModel('classify').id).toBe('clip-b32');
     expect(defaultModel('search').id).toBe('qwen3-1.7b'); // D32
     expect(defaultModel('pose').id).toBe('pose-lite');
@@ -104,7 +104,7 @@ describe('model registry', () => {
 
   it('settings choose a model per task, falling back to the default', () => {
     expect(chosenModel({ models: { cutout: 'ormbg' } }, 'cutout').id).toBe('ormbg');
-    expect(chosenModel({ models: { cutout: 'clip-b32' } }, 'cutout').id).toBe('birefnet-lite'); // wrong task
+    expect(chosenModel({ models: { cutout: 'clip-b32' } }, 'cutout').id).toBe('ormbg'); // wrong task
     expect(chosenModel({ models: {} }, 'search').id).toBe('qwen3-1.7b');
   });
 

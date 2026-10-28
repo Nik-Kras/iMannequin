@@ -196,6 +196,16 @@ describe('#16 / #20 what a job leaves behind', () => {
   });
 });
 
+describe('#7 the default cut-out model', () => {
+  it('#7 ORMBG is the default and the onboarding download; BiRefNet-lite stays selectable', async () => {
+    const { defaultModel, chosenModel, specsFor, ONBOARDING_MODELS } = await import('../../src/ai/registry');
+    expect(defaultModel('cutout').id).toBe('ormbg');
+    expect(ONBOARDING_MODELS).toEqual(['ormbg', 'clip-b32']);
+    expect(specsFor('cutout').map((s) => s.id)).toContain('birefnet-lite');
+    expect(chosenModel({ models: { cutout: 'birefnet-lite' } }, 'cutout').id).toBe('birefnet-lite');
+  });
+});
+
 // ---- The AI worker's life (bug-audit #6, #8): a stand-in Worker that logs what it is told ----
 const events: string[] = [];
 const running = () => globalThis.localStorage.getItem('imq-ai-running');

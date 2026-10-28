@@ -11,7 +11,7 @@ import { getSettings, updateSettings, db } from '../../data/db';
 import { SAMPLES, renderGarmentPng, seedSampleWardrobe } from '../../dev/samples';
 import ModelDownload from '../../screens/ModelDownload';
 import ModelLab from '../../screens/ModelLab';
-import { analyseGarment, cutOutGarment, detectDevice, downloadModel, failedModels, findSameItem, resetFailures, searchWardrobeDetailed } from '../index';
+import { analyseGarment, cutOutGarment, detectDevice, downloadModel, failedModels, findSameItem, ONBOARDING_MODELS, resetFailures, searchWardrobeDetailed } from '../index';
 import type { Lang } from '../../domain/types';
 
 const params = new URLSearchParams(location.search);
@@ -63,7 +63,7 @@ function E2E() {
       const result: Record<string, unknown> = { device: await detectDevice(), rows: [] as unknown[] };
       try {
         if (!params.has('offline')) {
-          for (const id of ['birefnet-lite', 'clip-b32']) {
+          for (const id of ONBOARDING_MODELS) {
             const t0 = performance.now();
             let last = 0;
             await downloadModel(id, (d, tot) => { if (d - last > tot / 10) { last = d; say(`${id} ${Math.round((100 * d) / tot)}%`); } });
