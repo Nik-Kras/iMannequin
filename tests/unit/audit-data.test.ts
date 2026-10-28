@@ -278,6 +278,26 @@ describe('#5 backup', () => {
   });
 });
 
+describe('#3 data writes survive iOS dropping the connection', () => {
+  it('#3 saving an item, a place or a merge is retried once after the connection is lost', async () => {
+    const { saveItem } = await import('../../src/data/repo');
+    const { addPlace, mergeIntoExisting } = await import('../../src/wardrobe/ops');
+    const lost = () => Promise.reject(new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'));
+    const item = { id: 'i', name: 'Tee', category: 'tshirt' as const, colours: [], seasons: [], status: 'active' as const, createdAt: 1, updatedAt: 1 };
+    vi.spyOn(db.items, 'put').mockImplementationOnce(lost);
+    await saveItem(item);
+    expect((await db.items.get('i'))?.name).toBe('Tee');
+    vi.spyOn(db.locations, 'put').mockImplementationOnce(lost);
+    const id = await addPlace(' Shelf ');
+    expect((await db.locations.get(id))?.name).toBe('Shelf');
+    await db.items.put({ ...item, id: 'r', status: 'review' });
+    await db.photos.put({ id: 'p', itemId: 'r', original: photo('o'), width: 1, height: 1, cutoutApproved: false, createdAt: 1 });
+    vi.spyOn(db.photos, 'bulkPut').mockImplementationOnce(lost);
+    await mergeIntoExisting('r', 'i');
+    expect((await db.photos.get('p'))?.itemId).toBe('i');
+  });
+});
+
 describe('#7 the default cut-out model', () => {
   it('#7 ORMBG is the default and the onboarding download; BiRefNet-lite stays selectable', async () => {
     const { defaultModel, chosenModel, specsFor, ONBOARDING_MODELS } = await import('../../src/ai/registry');

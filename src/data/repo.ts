@@ -1,6 +1,6 @@
 // Shared reads and writes. Feature modules add their own helpers next to their screens.
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, DEFAULT_PLACES, defaultSettings, getSettings, newId, updateSettings } from './db';
+import { db, DEFAULT_PLACES, defaultSettings, getSettings, newId, updateSettings, withReopen } from './db';
 import type { AppSettings, Item, Location, OutfitDraft, Photo, Slot } from '../domain/types';
 import { CATEGORY, placeItem } from '../domain/taxonomy';
 import { translate } from '../i18n';
@@ -35,17 +35,20 @@ export function useLocations(): Location[] | undefined {
 
 /** First run: create the default storage places in the user's language (D22). */
 export async function ensureDefaultPlaces(lang: AppSettings['lang']): Promise<void> {
-  if ((await db.locations.count()) > 0) return;
-  await db.locations.bulkAdd(DEFAULT_PLACES.map((key, i) => ({ id: newId(), name: translate(lang, key), order: i })));
+  await withReopen(() => db.transaction('rw', db.locations, async () => {
+    if ((await db.locations.count()) > 0) return;
+    await db.locations.bulkAdd(DEFAULT_PLACES.map((key, i) => ({ id: newId(), name: translate(lang, key), order: i })));
+  }));
 }
 
+// Writes reopen a connection iOS dropped, once, and throw if it still fails (bug-audit #3).
 export async function saveItem(item: Item): Promise<void> {
-  await db.items.put({ ...item, updatedAt: Date.now() });
+  await withReopen(() => db.items.put({ ...item, updatedAt: Date.now() }));
 }
 
 /** Deletes an item, its photos, and removes it from outfits, the draft and trips. */
 export async function deleteItem(id: string): Promise<void> {
-  await db.transaction('rw', [db.items, db.photos, db.outfits, db.trips, db.settings, db.anchors], async () => {
+  await withReopen(() => db.transaction('rw', [db.items, db.photos, db.outfits, db.trips, db.settings, db.anchors], async () => {
     const photoIds = (await db.photos.where('itemId').equals(id).primaryKeys()) as string[];
     await db.anchors.bulkDelete(photoIds);
     await db.photos.where('itemId').equals(id).delete();
@@ -67,7 +70,7 @@ export async function deleteItem(id: string): Promise<void> {
     const d = s.draft;
     const dslots = Object.fromEntries(Object.entries(d.slots).filter(([, v]) => v !== id));
     await db.settings.put({ ...s, draft: { ...d, slots: dslots, accessories: d.accessories.filter((a) => a !== id) } });
-  });
+  }));
 }
 
 /** Dress-up's current outfit lives in settings so it survives reloads. */

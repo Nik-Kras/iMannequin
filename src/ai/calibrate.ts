@@ -1,6 +1,6 @@
 // Model lab calibration (architecture §5, D12): every downloaded candidate runs on up to 12 photos from
 // the wardrobe; timings and simple scores are stored as CalibrationRun rows (no photos, R1).
-import { db, newId } from '../data/db';
+import { db, newId, withReopen } from '../data/db';
 import type { AiTask, CalibrationRun, CategoryId, Item, Photo, Season } from '../domain/types';
 import { deviceFor, exclusive, failKey, guarded, releaseAi, run, detectDevice } from './client';
 import { isDownloaded } from './downloads';
@@ -79,7 +79,7 @@ export async function calibrate(onStep: (s: CalibrationStep) => void, signal: Ab
   const save = async (task: AiTask, modelId: string, photos: number, totalMs: number, editedRate?: number) => {
     if (!photos) return;
     const row: CalibrationRun = { id: newId(), task, modelId, photos, msPerPhoto: Math.round(totalMs / photos), editedRate, device, createdAt };
-    await db.calibration.put(row);
+    await withReopen(() => db.calibration.put(row));
     out.runs.push(row);
   };
   const downloaded = async (task: AiTask) => {
