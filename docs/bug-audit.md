@@ -305,7 +305,7 @@ Everything is synthetic (R2): garments are the design canvas's paper shapes, the
 
 ## Status
 
-**All 50 items are fixed (2026-10-28)**, and so are #51–#53, found on the owner's phone afterwards, two of them only in part: #9 and #40. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
+**All 50 items are fixed (2026-10-28)**, two of them only in part (#9 and #40), and so are #51–#53, found on the owner's phone afterwards. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
 
 **How it was fixed.** Four agents worked in parallel, each in its own git worktree and owning a set of files:
 - data, AI and memory;

@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/AI-on%20the%20phone-55524C" alt="AI runs on the phone">
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
   <img src="https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white" alt="TypeScript 7">
-  <img src="https://img.shields.io/badge/tests-216%20unit%20%C2%B7%20155%20e2e-B3261E" alt="216 unit and 155 end-to-end tests">
+  <img src="https://img.shields.io/badge/tests-216%20unit%20%C2%B7%20156%20e2e-B3261E" alt="216 unit and 156 end-to-end tests">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
@@ -139,8 +139,8 @@ flowchart TB
 ## Quality
 
 - **216 unit tests** (Vitest) for the logic: the processing queue, worker lifecycle, backup and restore, search parsing, the pose check and body masks, garment fitting, naming, reminders and the crash black box.
-- **155 end-to-end tests** (Playwright on WebKit, Safari's engine, at iPhone size) run every flow with a fake camera and synthetic garments. A few run the real cut-out, classification and pose models to catch memory crashes and privacy leaks.
-- **A five-agent bug audit** found 50 issues, from lost photos to tap targets, and the first days on a real phone found two more. Each one has a test named after it that failed on the old code and passes now ([docs/bug-audit.md](docs/bug-audit.md)).
+- **156 end-to-end tests** (Playwright on WebKit, Safari's engine, at iPhone size) run every flow with a fake camera and synthetic garments. A few run the real cut-out, classification and pose models to catch memory crashes and privacy leaks.
+- **A five-agent bug audit** found 50 issues, from lost photos to tap targets, and the first days on a real phone found three more. Each one has a test named after it that failed on the old code and passes now ([docs/bug-audit.md](docs/bug-audit.md)).
 - **Crash reports** from real phones (Sentry, with an on-phone black box that reports out-of-memory closes on the next launch).
 
 ## Develop
@@ -186,7 +186,7 @@ docs/           Decisions, architecture, try-on, design, bug audit
 - [Architecture](docs/architecture.md): stack, AI pipeline, data model, storage, privacy, diagnostics
 - [Mannequin & try-on](docs/try-on.md): body processing, garment anchors, fitting, layering
 - [Design](docs/design.md): the black-and-white paper-cut style, type, colour, components
-- [Bug audit](docs/bug-audit.md): 52 issues found and fixed, each with its test
+- [Bug audit](docs/bug-audit.md): 53 issues found and fixed, each with its test
 
 ## Disclaimer
 
