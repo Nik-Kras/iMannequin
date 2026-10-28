@@ -39,6 +39,12 @@
   --shadow-sheet: 0 -4px 16px rgba(20, 20, 20, 0.08);
   --cutout-filter: drop-shadow(1.2px 0 0 #fff) drop-shadow(-1.2px 0 0 #fff) drop-shadow(0 1.2px 0 #fff) drop-shadow(0 -1.2px 0 #fff) drop-shadow(1px 2px 1.5px rgba(20, 20, 20, 0.24));
 
+  /* One pixel of text: it follows the phone's text size, up to 200 % (bug-audit #38). Text inside fixed
+     geometry (Dress-up, the tab bar, badges) grows to 125 %, large titles to 150 %. */
+  --t: min(calc(1rem / 16), 2px);
+  --t-tight: min(var(--t), 1.25px);
+  --t-title: min(var(--t), 1.5px);
+
   --gutter: 20px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -48,13 +54,20 @@
   -webkit-text-size-adjust: 100%;
 }
 
+/* iPhone: the root size is the iOS Text Size setting (17px at the default size). Desktop Safari and the
+   test browser report a fixed 13px for this font, so the rule is limited to iOS. */
+@supports (-webkit-touch-callout: none) and (font: -apple-system-body) {
+  html { font: -apple-system-body; }
+  :root { --t: min(calc(1rem / 17), 2px); }
+}
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font: 400 16px/1.45 var(--font-text);
+  font: 400 calc(16 * var(--t))/1.45 var(--font-text);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
@@ -91,13 +104,13 @@ h1, h2, h3, p { margin: 0; }
 .hscroll::-webkit-scrollbar { display: none; }
 
 /* ---------- Type ---------- */
-.h1 { font: 400 30px/1.05 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; }
-.h2 { font: 400 21px/1.2 var(--font-display); }
-.title-card { font: 600 16px/1.3 var(--font-text); }
-.body { font: 400 16px/1.45 var(--font-text); }
-.row-text { font: 500 15px/1.35 var(--font-text); }
-.meta { font: 400 13px/1.35 var(--font-text); color: var(--graphite); }
-.hand { font: 600 20px/1.1 var(--font-hand); }
+.h1 { font: 400 calc(30 * var(--t-title))/1.05 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; }
+.h2 { font: 400 calc(21 * var(--t))/1.2 var(--font-display); }
+.title-card { font: 600 calc(16 * var(--t))/1.3 var(--font-text); }
+.body { font: 400 calc(16 * var(--t))/1.45 var(--font-text); }
+.row-text { font: 500 calc(15 * var(--t))/1.35 var(--font-text); }
+.meta { font: 400 calc(13 * var(--t))/1.35 var(--font-text); color: var(--graphite); }
+.hand { font: 600 calc(20 * var(--t))/1.1 var(--font-hand); }
 .num { font-variant-numeric: tabular-nums; }
 
 /* ---------- Header ---------- */
@@ -105,14 +118,14 @@ h1, h2, h3, p { margin: 0; }
 .header__actions { display: flex; gap: 10px; align-items: center; }
 .back {
   display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 6px 0 0;
-  border: 0; background: none; font: 500 15px var(--font-text); text-decoration: none; color: var(--ink);
+  border: 0; background: none; font: 500 calc(15 * var(--t)) var(--font-text); text-decoration: none; color: var(--ink);
 }
 
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  height: 52px; padding: 0 22px; border-radius: var(--r-button);
-  font: 600 16px/1.2 var(--font-text); text-decoration: none; white-space: nowrap;
+  min-height: 52px; padding: 6px 22px; border-radius: var(--r-button);
+  font: 600 calc(16 * var(--t))/1.2 var(--font-text); text-decoration: none; text-align: center;
   transition: transform 120ms ease-out, box-shadow 120ms ease-out, opacity 120ms;
 }
 .btn:active { transform: translateY(1px); }
@@ -121,12 +134,12 @@ h1, h2, h3, p { margin: 0; }
 .btn--primary { border: 0; background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-button); }
 .btn--secondary { border: 1.5px solid var(--ink); background: var(--sheet); color: var(--ink); }
 .btn--danger { border: 1.5px solid var(--marker); background: var(--sheet); color: var(--marker); }
-.btn--block { width: 100%; white-space: normal; text-align: center; } /* a long label wraps instead of overflowing (#39) */
-.btn--sm { height: 44px; padding: 0 16px; font-size: 15px; }
+.btn--block { width: 100%; } /* a long label wraps instead of overflowing (#39, #38) */
+.btn--sm { min-height: 44px; padding: 0 16px; font-size: calc(15 * var(--t)); }
 .btn--square { width: 52px; padding: 0; flex: none; }
 .text-action {
   display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px;
-  border: 0; background: none; font: 600 14px var(--font-text); color: var(--ink); text-decoration: none;
+  border: 0; background: none; font: 600 calc(14 * var(--t)) var(--font-text); color: var(--ink); text-decoration: none;
 }
 .icon-btn {
   width: 44px; height: 44px; flex: none; border-radius: 50%; border: 0;
@@ -138,26 +151,27 @@ h1, h2, h3, p { margin: 0; }
 
 /* ---------- Chips, segmented, switch ---------- */
 .chip {
-  position: relative; flex: none; height: 36px; padding: 0 14px; border-radius: 999px;
+  position: relative; flex: none; min-height: 36px; padding: 0 14px; border-radius: 999px;
   border: 1.5px solid var(--ink); background: var(--sheet); color: var(--ink);
-  font: 500 14.5px var(--font-text); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font: 500 calc(14.5 * var(--t)) var(--font-text); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
 }
 .chip::after { content: ''; position: absolute; inset: -4px -2px; } /* 44px touch area */
 .chip[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
 .chip--soft { border-color: transparent; background: var(--tissue); }
 .chip--dashed { border-style: dashed; border-color: var(--line); background: transparent; }
 .chip__ai { width: 12px; height: 12px; flex: none; }
-.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 20px; background: var(--tissue); }
+/* Segmented controls grow to 125 % like the tab bar, so both choices stay side by side (#38). */
+.seg { --t: var(--t-tight); display: inline-flex; gap: 2px; padding: 3px; border-radius: 20px; background: var(--tissue); }
 .seg--on-paper { background: var(--sheet); box-shadow: var(--shadow-rest); }
 .seg button {
-  position: relative; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: transparent;
-  font: 500 14px var(--font-text); color: var(--ink);
+  position: relative; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: transparent;
+  font: 500 calc(14 * var(--t)) var(--font-text); color: var(--ink);
 }
 .seg button::after { content: ''; position: absolute; inset: -5px 0; } /* 44px touch area (bug-audit #42) */
 .seg button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
 .switch {
   display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0;
-  border: 0; background: none; font: 500 15px var(--font-text); color: var(--ink);
+  border: 0; background: none; font: 500 calc(15 * var(--t)) var(--font-text); color: var(--ink);
 }
 .switch__track { position: relative; width: 44px; height: 26px; flex: none; border-radius: 13px; background: var(--switch-off); transition: background 150ms; }
 .switch__track::after {
@@ -177,7 +191,7 @@ h1, h2, h3, p { margin: 0; }
 .list-row {
   display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 16px;
   border: 0; background: none; width: 100%; text-align: left; text-decoration: none; color: var(--ink);
-  font: 500 15px var(--font-text);
+  font: 500 calc(15 * var(--t)) var(--font-text);
 }
 .list-row + .list-row { border-top: 1px solid var(--rule); }
 .dashed-slot { border: 1.5px dashed var(--line); border-radius: var(--r-card); background: transparent; color: var(--graphite); }
@@ -214,25 +228,25 @@ h1, h2, h3, p { margin: 0; }
 
 /* ---------- Fields ---------- */
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field__label { font: 500 14px var(--font-text); }
+.field__label { font: 500 calc(14 * var(--t)) var(--font-text); }
 .input {
-  height: 48px; width: 100%; padding: 0 14px; border: 0; border-radius: var(--r-field);
-  background: var(--tissue); font: 400 16px var(--font-text); color: var(--ink);
+  min-height: 48px; width: 100%; padding: 0 14px; border: 0; border-radius: var(--r-field);
+  background: var(--tissue); font: 400 calc(16 * var(--t)) var(--font-text); color: var(--ink);
 }
 textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: vertical; }
 .input::placeholder { color: var(--graphite); }
 
 /* ---------- Paper devices ---------- */
 .tag {
-  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 9px;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px 0 9px;
   border: 1.5px solid var(--ink); border-radius: 3px 15px 15px 3px; background: var(--sheet);
-  font: 600 20px/1 var(--font-hand); color: var(--ink); white-space: nowrap;
+  font: 600 calc(20 * var(--t))/1 var(--font-hand); color: var(--ink); white-space: nowrap;
 }
 .tag::before { content: ''; width: 7px; height: 7px; flex: none; border-radius: 50%; border: 1.5px solid currentColor; }
 .tag--ink { background: var(--ink); color: var(--sheet); }
 .stamp {
-  display: inline-flex; align-items: center; height: 38px; padding: 0 12px;
-  border: 2px solid var(--ink); border-radius: 6px; font: 700 22px/1 var(--font-hand);
+  display: inline-flex; align-items: center; min-height: 38px; padding: 0 12px;
+  border: 2px solid var(--ink); border-radius: 6px; font: 700 calc(22 * var(--t))/1 var(--font-hand);
   opacity: 0.85; transform: rotate(-8deg);
 }
 .stamp--in { animation: stamp-in 220ms cubic-bezier(0.3, 1.5, 0.5, 1); }
@@ -254,10 +268,10 @@ textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: ver
 }
 .tab {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1 1 0; min-width: 0;
-  font: 500 12px var(--font-text); color: var(--graphite); text-decoration: none; border: 0; background: none; padding: 0;
+  font: 500 calc(12 * var(--t-tight)) var(--font-text); color: var(--graphite); text-decoration: none; border: 0; background: none; padding: 0;
   text-align: center; overflow-wrap: anywhere;
 }
-@media (max-width: 300px) { .tab { font-size: 10.5px; } .tab__icon { width: 44px; } } /* page zoom (bug-audit #39) */
+@media (max-width: 300px) { .tab { font-size: calc(10.5 * var(--t-tight)); } .tab__icon { width: 44px; } } /* page zoom (bug-audit #39) */
 .tab__icon { width: 52px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: var(--ink); }
 .tab[aria-current='page'] { color: var(--ink); font-weight: 600; }
 .tab[aria-current='page'] .tab__icon { background: var(--ink); color: var(--sheet); }
@@ -271,7 +285,7 @@ textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: ver
 /* ---------- Banners and states ---------- */
 .banner {
   display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-card);
-  background: var(--ink); color: var(--sheet); font: 500 15px var(--font-text); text-decoration: none; border: 0; width: 100%; text-align: left;
+  background: var(--ink); color: var(--sheet); font: 500 calc(15 * var(--t)) var(--font-text); text-decoration: none; border: 0; width: 100%; text-align: left;
 }
 .empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px var(--gutter); text-align: center; color: var(--graphite); }
 .bar { height: 6px; border-radius: 3px; background: var(--tissue); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
@@ -282,7 +296,7 @@ textarea.input { height: auto; min-height: 84px; padding: 12px 14px; resize: ver
 .toast {
   position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + 16px); z-index: 50;
   display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-card);
-  background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-lift); font: 500 15px var(--font-text);
+  background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-lift); font: 500 calc(15 * var(--t)) var(--font-text);
   animation: sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .toast .text-action { color: var(--sheet); }
