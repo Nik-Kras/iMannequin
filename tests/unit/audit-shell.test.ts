@@ -1,30 +1,11 @@
-// Shell, wear log and reminder fixes from docs/bug-audit.md that can be checked without a browser.
+// Shell and wear log fixes from docs/bug-audit.md that can be checked without a browser.
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../../src/data/db';
 import { todayISO } from '../../src/data/repo';
 import type { Item } from '../../src/domain/types';
-import { shouldRemindBackup } from '../../src/life/reminder';
 import { deleteWear, logOutfit, markWorn, wornAt } from '../../src/life/wear';
 import { blackbox, watchUnhandled } from '../../src/diag/diagnostics';
-
-const day = 86_400_000;
-
-describe('#36 the backup reminder waits until the wardrobe is worth a copy', () => {
-  const now = Date.UTC(2026, 9, 28, 9);
-  it('#36 one new garment: no reminder yet', () => {
-    expect(shouldRemindBackup({ itemCount: 1, firstItemAt: now - day, now })).toBe(false);
-    expect(shouldRemindBackup({ itemCount: 9, firstItemAt: now - 2 * day, now })).toBe(false);
-  });
-  it('#36 ten garments, or three days after the first one', () => {
-    expect(shouldRemindBackup({ itemCount: 10, firstItemAt: now - 60_000, now })).toBe(true);
-    expect(shouldRemindBackup({ itemCount: 1, firstItemAt: now - 3 * day, now })).toBe(true);
-  });
-  it('#36 still monthly after a backup or a dismissal', () => {
-    expect(shouldRemindBackup({ itemCount: 20, lastBackupAt: now - 10 * day, now })).toBe(false);
-    expect(shouldRemindBackup({ itemCount: 20, backupReminderAt: now - 10 * day, now })).toBe(false);
-  });
-});
 
 const item = (id: string, lastWornAt?: number): Item => ({
   id, name: id, category: 'jeans', colours: ['navy'], seasons: ['autumn'], status: 'active', createdAt: 1, updatedAt: 1, lastWornAt,

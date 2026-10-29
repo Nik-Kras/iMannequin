@@ -25,9 +25,19 @@ export async function prepareBodyPhoto(file: Blob): Promise<Blob> {
 }
 
 export async function processBodyPhoto(photo: Blob): Promise<{ body?: BodyRecord; issues: PoseIssue[] }> {
+  // The 2048 px photo is decoded once, for the pose and for the cut-out (bug-audit #9).
+  const bitmap = await createImageBitmap(photo, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(photo));
+  try {
+    return await processDecoded(photo, bitmap);
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+async function processDecoded(photo: Blob, bitmap: ImageBitmap): Promise<{ body?: BodyRecord; issues: PoseIssue[] }> {
   let pose: Awaited<ReturnType<typeof detectPose>>;
   try {
-    pose = await detectPose(photo);
+    pose = await detectPose(photo, bitmap);
   } catch (err) {
     // No person found is a pose problem the user can fix; anything else (model failed to load) is thrown.
     if (err instanceof PoseError && err.code === 'no-person') return { issues: [{ code: 'visibility', detail: 'body' }] };
@@ -70,7 +80,6 @@ export async function processBodyPhoto(photo: Blob): Promise<{ body?: BodyRecord
   mc.drawImage(maskImg as CanvasImageSource, 0, 0, W, H);
 
   // Cut-out: the straightened photo, kept only inside the mask.
-  const bitmap = await createImageBitmap(photo);
   const cut = makeCanvas(CANON.width, CANON.height);
   const cc = ctx2d(cut);
   cc.imageSmoothingQuality = 'high';
@@ -79,7 +88,6 @@ export async function processBodyPhoto(photo: Blob): Promise<{ body?: BodyRecord
   cc.setTransform(1, 0, 0, 1, 0, 0);
   cc.globalCompositeOperation = 'destination-in';
   cc.drawImage(maskCanon as CanvasImageSource, 0, 0);
-  bitmap.close?.();
 
   const canonMask = maskFromImageData(mc.getImageData(0, 0, CANON.width, CANON.height));
   const metrics = bodyMetrics(canonMask, landmarks);

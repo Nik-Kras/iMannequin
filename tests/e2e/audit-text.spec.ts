@@ -56,12 +56,6 @@ test('#38 at 200 % text nothing is cut off or pushed off the screen', async ({ p
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     if (width > vw) problems.push(`${route}: scrolls sideways (${width} px)`);
     for (const c of await clipped(page)) problems.push(`${route}: ${c}`);
-    const covered = await page.evaluate(() => {
-      const note = document.querySelector('.backup-reminder')?.getBoundingClientRect();
-      const title = document.querySelector('main h1')?.getBoundingClientRect();
-      return !!note && !!title && note.bottom > title.top;
-    });
-    if (covered) problems.push(`${route}: the backup reminder covers the title`);
   }
   expect(problems).toEqual([]);
 });

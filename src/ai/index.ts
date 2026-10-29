@@ -190,15 +190,15 @@ export async function findSameItemWithColours(embedding: Float32Array, category:
   return decideSameItem(cands, newColours, SAME_ITEM_THRESHOLD[model] ?? 0.93);
 }
 
-/** Body key points and person mask from the A-pose photo. */
-export function detectPose(photo: Blob): Promise<PoseResult> {
-  return exclusive(() => pose(photo));
+/** Body key points and person mask from the A-pose photo; `bitmap` is the photo already decoded by the caller. */
+export function detectPose(photo: Blob, bitmap?: ImageBitmap): Promise<PoseResult> {
+  return exclusive(() => pose(photo, bitmap));
 }
 
-async function pose(photo: Blob): Promise<PoseResult> {
+async function pose(photo: Blob, bitmap?: ImageBitmap): Promise<PoseResult> {
   // Tests stand in for MediaPipe with synthetic key points (R2: no real body photos in the repo).
-  const fake = (globalThis as { __imqFakePose?: (p: Blob) => Promise<PoseResult> }).__imqFakePose;
-  if (fake) return fake(photo);
+  const fake = (globalThis as { __imqFakePose?: (p: Blob, b?: ImageBitmap) => Promise<PoseResult> }).__imqFakePose;
+  if (fake) return fake(photo, bitmap);
   await releaseAi(); // one AI model in memory at a time
   const settings = await getSettings();
   const chosen = chosenModel(settings, 'pose');
@@ -206,7 +206,7 @@ async function pose(photo: Blob): Promise<PoseResult> {
   let lastErr: unknown;
   for (const s of order) {
     try {
-      const r = await risky(`pose:${s.id}`, () => runPose(photo, s.source));
+      const r = await risky(`pose:${s.id}`, () => runPose(photo, s.source, bitmap));
       record('pose.done', { model: s.id, width: r.width, height: r.height, points: r.landmarks.length });
       return { ...r, model: s.id };
     } catch (err) {

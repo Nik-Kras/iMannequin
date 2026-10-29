@@ -47,8 +47,7 @@ test.describe('#27 Dress-up layout on small screens', () => {
       // The Shoes row: the Shoes slot and the feet stay above it (D31).
       await page.getByRole('button', { name: /^Взуття/ }).click();
       await expect(page.locator('.du__row')).toBeVisible();
-      await page.waitForTimeout(400);
-      await check('feet row');
+      await expect(() => check('feet row')).toPass({ timeout: 5000 });
       const row = await box(page, '.du__row');
       const shoes = (await page.getByRole('button', { name: /^Взуття/ }).boundingBox())!;
       expect(shoes.y + shoes.height, 'Shoes slot above the row').toBeLessThanOrEqual(row.y);
@@ -59,7 +58,8 @@ test.describe('#27 Dress-up layout on small screens', () => {
       await page.locator('.du__row .seg button').first().click();
       const toggle = (await page.getByRole('switch').boundingBox())!;
       expect(toggle.x + toggle.width, 'Tuck in inside the screen').toBeLessThanOrEqual(vw);
-      await check('top row');
+      // Measured once the row has finished sliding up and the column has moved to make room.
+      await expect(() => check('top row')).toPass({ timeout: 5000 });
     });
   }
 });
@@ -315,4 +315,26 @@ test('#48 slots, row cards and See all cards have a pressed state', async ({ pag
     return out.join(' ');
   });
   for (const cls of ['.du-slot', '.du-card', '.sa-card']) expect(rules).toContain(`${cls}:active`);
+});
+
+test('Q19 a filled slot hides its zone label so a long name gets three lines', async ({ page }) => {
+  await openApp(page, { seed: true });
+  const jeans = await itemId(page, 'Blue jeans');
+  await dress(page);
+  await withDb(page, `const i = await db.items.get('${jeans}'); await db.items.put({ ...i, name: 'Dark blue wide-leg selvedge jeans with turn-ups' });`);
+  const slot = page.getByRole('button', { name: /^Bottoms.*selvedge/ });
+  await expect(slot).toBeVisible();
+  const view = await slot.evaluate((el) => {
+    const label = el.querySelector<HTMLElement>('.du-slot__label')!;
+    const name = el.querySelector<HTMLElement>('.du-slot__name')!;
+    return {
+      labelShown: label.getBoundingClientRect().width > 2,
+      lines: Math.round(name.getBoundingClientRect().height / parseFloat(getComputedStyle(name).lineHeight)),
+      inside: name.getBoundingClientRect().bottom <= el.getBoundingClientRect().bottom + 0.5,
+    };
+  });
+  expect(view).toEqual({ labelShown: false, lines: 3, inside: true });
+  // An empty slot still says what it is.
+  const hat = page.getByRole('button', { name: /^Hat/ });
+  expect(await hat.locator('.du-slot__label').evaluate((el) => el.getBoundingClientRect().width > 2)).toBe(true);
 });

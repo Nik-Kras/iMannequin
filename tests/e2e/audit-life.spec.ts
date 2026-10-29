@@ -1,4 +1,4 @@
-// Outfits, wear log, trips, sharing, settings and the backup reminder (docs/bug-audit.md). WebKit, iPhone 15 Pro.
+// Outfits, wear log, trips, sharing, settings and backups (docs/bug-audit.md). WebKit, iPhone 15 Pro.
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { failWrites, openApp, withDb } from './helpers';
@@ -151,18 +151,16 @@ test.describe('#34 #36 #14 settings and reminders', () => {
     expect(await withDb(page, 'return db.locations.count()')).toBe(0);
   });
 
-  test('#36 one new garment doesn’t trigger the backup reminder yet', async ({ page }) => {
-    await openApp(page, { seed: true, route: '/wardrobe' });
-    await withDb(page, `const all = await db.items.toArray(); await db.items.bulkDelete(all.slice(1).map((i) => i.id));`);
-    await page.waitForTimeout(500);
-    await expect(page.getByRole('button', { name: 'Back up' })).toHaveCount(0);
-  });
-
-  test('#36 ten garments show a quiet reminder whose Ukrainian action is “Створити копію”', async ({ page }) => {
+  test('D54 no backup banner appears on its own; Settings shows the backup status', async ({ page }) => {
     await openApp(page, { seed: true, lang: 'uk', route: '/wardrobe' });
-    const reminder = page.locator('.backup-reminder');
-    await expect(reminder.getByRole('button', { name: 'Створити копію' })).toBeVisible();
-    await expect(reminder).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await withDb(page, `const s = await db.settings.get('app'); await db.settings.put({ ...s, lastBackupAt: undefined });`);
+    for (const route of ['/wardrobe', '/outfits', '/trips', '/wear-log']) {
+      await page.evaluate((r) => { location.hash = r; }, route);
+      await page.waitForTimeout(500);
+      await expect(page.getByRole('button', { name: 'Створити копію' })).toHaveCount(0);
+    }
+    await page.evaluate(() => { location.hash = '#/settings'; });
+    await expect(page.getByText('Копії ще не було')).toBeVisible();
   });
 
   test('#14 Settings offers “Take body photo” when there is none', async ({ page }) => {

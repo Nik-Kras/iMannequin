@@ -1,8 +1,10 @@
 // Shared helpers for the end-to-end tests. Everything is synthetic (R2): garments are the design canvas's paper
 // shapes drawn on a plain table, the body is a drawn A-pose figure, and MediaPipe is replaced by key points
 // computed from that drawing (window.__imqFakePose, read by src/ai/index.ts).
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { join, normalize } from 'node:path';
 import type { BrowserContext, Page } from '@playwright/test';
 import { SHAPES } from '../../src/dev/shapes';
 
@@ -69,8 +71,8 @@ function pageLib({ SHAPES }: { SHAPES: Record<string, { vb: string; d: string; x
 
 function fakePose() {
   const w = window as unknown as Record<string, any>;
-  w.__imqFakePose = async (blob: Blob) => {
-    const bmp = await createImageBitmap(blob);
+  w.__imqFakePose = async (blob: Blob, shared?: ImageBitmap) => {
+    const bmp = shared ?? await createImageBitmap(blob);
     const W = bmp.width, H = bmp.height;
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d')!; g.drawImage(bmp, 0, 0);
@@ -115,19 +117,40 @@ export async function fakeDevice(context: BrowserContext, { camera = 'live' as C
  * Serves Hugging Face model files from a local mirror (IMQ_MODEL_MIRROR, laid out as <org>/<repo>/<file>), so tests
  * that run the real cut-out and classifier don't download them. Returns false when there is no mirror: such tests skip.
  */
-export async function modelMirror(context: BrowserContext): Promise<boolean> {
+export async function modelMirror(context: BrowserContext, browserName = 'webkit'): Promise<boolean> {
   const dir = process.env.IMQ_MODEL_MIRROR;
   if (!dir || !existsSync(dir)) return false;
+  // Chromium closes when a 100+ MB model comes through the test protocol, so it's redirected to a local file server;
+  // WebKit can't be redirected from a route, so it gets the file itself.
+  const base = browserName === 'chromium' ? await mirrorServer(dir) : undefined;
   await context.route('https://huggingface.co/**', async (route) => {
     const m = new URL(route.request().url()).pathname.match(/^\/([^/]+)\/([^/]+)\/resolve\/[^/]+\/(.+)$/);
     const file = m && join(dir, m[1], m[2], decodeURIComponent(m[3]));
-    if (file && existsSync(file) && statSync(file).isFile()) {
-      const body = readFileSync(file);
-      return route.fulfill({ status: 200, body, headers: { 'content-type': 'application/octet-stream', 'content-length': String(body.length), 'access-control-allow-origin': '*' } });
-    }
-    return route.abort();
+    if (!file || !existsSync(file) || !statSync(file).isFile()) return route.abort();
+    if (base) return route.fulfill({ status: 302, headers: { location: `${base}/${m[1]}/${m[2]}/${m[3]}`, 'access-control-allow-origin': '*' } });
+    const body = readFileSync(file);
+    return route.fulfill({ status: 200, body, headers: { 'content-type': 'application/octet-stream', 'content-length': String(body.length), 'access-control-allow-origin': '*' } });
   });
   return true;
+}
+
+/** One static server per test worker for the model mirror (<org>/<repo>/<file>), with CORS. Returns its origin. */
+let mirror: Promise<string> | undefined;
+function mirrorServer(dir: string): Promise<string> {
+  mirror ??= new Promise((resolve) => {
+    const srv: Server = createServer((req, res) => {
+      const file = join(dir, normalize(decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)));
+      if (!file.startsWith(dir) || !existsSync(file) || !statSync(file).isFile()) {
+        res.writeHead(404, { 'access-control-allow-origin': '*' });
+        return res.end();
+      }
+      res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': statSync(file).size, 'access-control-allow-origin': '*' });
+      createReadStream(file).pipe(res);
+    });
+    srv.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${(srv.address() as AddressInfo).port}`));
+    srv.unref();
+  });
+  return mirror;
 }
 
 /** What the fake live camera films from now on. */
@@ -164,7 +187,12 @@ export async function openApp(page: Page, { seed = false, onboarded = true, lang
   await page.goto(`./?e2e${seed ? '&seed' : ''}#/welcome`);
   // boot() drops ?seed from the URL once the sample wardrobe is stored.
   await page.waitForFunction(() => (window as unknown as { __imq?: unknown }).__imq && !location.search.includes('seed'));
-  await withDb(page, `let s; while (!(s = await db.settings.get('app'))) await new Promise((r) => setTimeout(r, 50)); await db.settings.put({ ...s, lang: '${lang}', installGuideDismissed: true, onboarded: ${onboarded}, modelsReady: true });`);
+  // In a transaction, so it can't undo a flag the app writes at the same time (such as placesSeeded).
+  await withDb(page, `while (!(await db.settings.get('app'))) await new Promise((r) => setTimeout(r, 50));
+    await db.transaction('rw', db.settings, async () => {
+      const s = await db.settings.get('app');
+      await db.settings.put({ ...s, lang: '${lang}', installGuideDismissed: true, onboarded: ${onboarded}, modelsReady: true });
+    });`);
   // Let the first page finish registering the service worker: WebKit reports the aborted sw.js fetch as a page error.
   await page.evaluate(() => Promise.race([navigator.serviceWorker?.ready, new Promise((r) => setTimeout(r, 3000))]));
   await page.goto(`./?e2e#${route}`);

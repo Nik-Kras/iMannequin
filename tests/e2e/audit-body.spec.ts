@@ -229,10 +229,10 @@ test.describe('found on the phone after the audit', () => {
   });
 });
 
-test('D61 the body silhouette comes from the cut-out model when it is on the phone', async ({ context, page }) => {
+test('D61 the body silhouette comes from the cut-out model when it is on the phone', async ({ context, page, browserName }) => {
   test.setTimeout(180_000);
   await fakeDevice(context);
-  if (!(await modelMirror(context))) test.skip(true, 'IMQ_MODEL_MIRROR is not set');
+  if (!(await modelMirror(context, browserName))) test.skip(true, 'IMQ_MODEL_MIRROR is not set');
   await openApp(page, { onboarded: false, route: '/body?onboarding=1' });
   // ORMBG on the phone, as after onboarding: its files, from the mirror, in the app's model cache.
   const ormbg = MODEL_SPECS.find((m) => m.id === 'ormbg')!;
@@ -248,3 +248,23 @@ test('D61 the body silhouette comes from the cut-out model when it is on the pho
   await expect(page).toHaveURL(/#\/dressup/);
 });
 
+
+test('#9 the 2048 px body photo is decoded once for the pose and the cut-out', async ({ context, page }) => {
+  await fakeDevice(context);
+  // Counts every decode of a JPEG on the page (the picked photo, then its 2048 px copy).
+  await context.addInitScript(() => {
+    const w = window as unknown as { __decodes: number; createImageBitmap: typeof createImageBitmap };
+    w.__decodes = 0;
+    const real = w.createImageBitmap.bind(window);
+    w.createImageBitmap = ((src: ImageBitmapSource, ...rest: unknown[]) => {
+      if (src instanceof Blob && src.type === 'image/jpeg') w.__decodes++;
+      return (real as (...a: unknown[]) => Promise<ImageBitmap>)(src, ...rest);
+    }) as typeof createImageBitmap;
+  });
+  await openApp(page, { onboarded: false, route: '/body?onboarding=1' });
+  await page.evaluate(() => { (window as unknown as { __decodes: number }).__decodes = 0; });
+  await page.locator('input[type=file]:not([capture])').setInputFiles(await bodyFile(page, 'good'));
+  await expect(page.getByRole('heading', { name: 'Check your points' })).toBeVisible();
+  // One decode to scale the picked photo down, one of the 2048 px copy shared by the pose and the cut-out.
+  expect(await page.evaluate(() => (window as unknown as { __decodes: number }).__decodes)).toBe(2);
+});

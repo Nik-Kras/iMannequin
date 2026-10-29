@@ -46,6 +46,7 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-clamp: 2;
 }
 .du-slot--top.is-tight .du-slot__name { -webkit-line-clamp: 1; line-clamp: 1; }
+.du-slot:not(.is-empty):not(.du-slot--top) .du-slot__name { -webkit-line-clamp: 3; line-clamp: 3; line-height: 1.1; } /* D62 */
 .du-slot__layers { display: flex; gap: 6px; padding-top: 2px; }
 .du-slot__layer {
   width: 38px; height: 30px; border-radius: var(--r-thumb); background: var(--tissue);

@@ -89,8 +89,4 @@ export default {
   'settings.noModels': 'Models appear here once they’re set up.',
   'settings.weatherData': 'Weather data',
   'settings.weatherCredit': 'Weather data by Open-Meteo.com, used only when the weather hint is on.',
-  'settings.reminderNever': 'Your wardrobe isn’t backed up yet.',
-  'settings.reminderOld': 'Your last backup is over a month old.',
-  'settings.reminderAction': 'Back up',
-  'settings.reminderDismiss': 'Remind me in a month',
 } as const;

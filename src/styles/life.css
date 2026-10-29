@@ -325,31 +325,3 @@ button.wearcal__cell:active { background: var(--rule); }
 .about__list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--rule); font: 500 calc(15 * var(--t)) var(--font-text); }
 .about__list li span + span { font: 400 calc(13.5 * var(--t)) var(--font-text); color: var(--graphite); text-align: right; }
 .about__lic { color: var(--ink); white-space: nowrap; }
-
-/* ---------- Backup reminder (D41) ---------- */
-/* While the banner shows, the screen under it starts lower, so nothing is covered. */
-/* --reminder-h is the banner's measured height: it grows with the text size (#38). */
-main:has(+ .backup-reminder) > .screen { padding-top: calc(var(--safe-top) + 30px + var(--reminder-h, 60px)); }
-/* A quiet paper note, not a warning (bug-audit #36). */
-.backup-reminder {
-  position: absolute; top: calc(var(--safe-top) + 10px); left: 16px; right: 16px; z-index: 5;
-  display: flex; align-items: center; gap: 8px; min-height: 60px; padding: 6px 4px 6px 14px;
-  font: 500 calc(14 * var(--t))/1.3 var(--font-text); color: var(--ink); animation: fade-in 200ms;
-}
-.backup-reminder > svg { flex: none; }
-.backup-reminder__go {
-  flex: none; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--ink); border-radius: 12px;
-  background: var(--sheet); color: var(--ink); font: 600 calc(14 * var(--t)) var(--font-text);
-}
-.backup-reminder__x {
-  flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--graphite);
-  display: flex; align-items: center; justify-content: center;
-}
-/* Narrow phones and page zoom: the action goes under the text, and the screen starts lower to match. */
-@media (max-width: 380px) {
-  .backup-reminder { flex-wrap: wrap; row-gap: 2px; padding: 6px 4px 10px 14px; }
-  .backup-reminder > .grow { flex-basis: calc(100% - 92px); }
-  .backup-reminder__x { order: 1; }
-  .backup-reminder__go { order: 2; margin-left: 28px; }
-  main:has(+ .backup-reminder) > .screen { padding-top: calc(var(--safe-top) + 30px + var(--reminder-h, 106px)); }
-}

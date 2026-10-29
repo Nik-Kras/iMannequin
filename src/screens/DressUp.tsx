@@ -320,7 +320,8 @@ export default function DressUp() {
                       {it ? <GarmentThumb item={it} photos={photos} w={34} h={30} /> : <Icon name="plus" size={18} strokeWidth={1.8} />}
                     </span>
                     <span className="du-slot__text">
-                      <span className="du-slot__label">{t(LABEL[s.id])}</span>
+                      {/* A filled slot shows only the garment's name, on up to three lines; the zone stays for VoiceOver (D62). */}
+                      <span className={`du-slot__label${it ? ' sr-only' : ''}`}>{t(LABEL[s.id])}</span>
                       <span className="du-slot__name">{it ? it.name : t(ADD[s.id])}</span>
                     </span>
                   </button>

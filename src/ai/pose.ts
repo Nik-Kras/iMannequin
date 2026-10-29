@@ -36,11 +36,12 @@ function blockMediapipeLogging() {
   }) as typeof fetch;
 }
 
-export async function runPose(photo: Blob, modelPath: string): Promise<PoseOutput> {
+/** `shared`: the photo already decoded by the caller, who closes it (bug-audit #9); otherwise it's decoded here. */
+export async function runPose(photo: Blob, modelPath: string, shared?: ImageBitmap): Promise<PoseOutput> {
   blockMediapipeLogging();
   const vision = await import('@mediapipe/tasks-vision');
   const fileset = await vision.FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}vendor/mediapipe`);
-  const bitmap = await (async () => {
+  const bitmap = shared ?? await (async () => {
     try { return await createImageBitmap(photo, { imageOrientation: 'from-image' }); } catch { return createImageBitmap(photo); }
   })();
   const make = (delegate: 'GPU' | 'CPU') => vision.PoseLandmarker.createFromOptions(fileset, {
@@ -79,7 +80,7 @@ export async function runPose(photo: Blob, modelPath: string): Promise<PoseOutpu
     throw new PoseError('load-failed', String((err as Error)?.message ?? err));
   } finally {
     landmarker?.close();
-    bitmap.close();
+    if (!shared) bitmap.close();
   }
 }
 

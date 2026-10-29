@@ -32,7 +32,6 @@ import Welcome from '../screens/Welcome';
 import InstallGuide from '../screens/InstallGuide';
 import ModelDownload from '../screens/ModelDownload';
 import ModelLab from '../screens/ModelLab';
-import BackupReminder from '../screens/BackupReminder';
 
 const ONBOARDING = ['welcome', 'models', 'body'];
 
@@ -111,7 +110,6 @@ function Shell() {
   return (
     <>
       <main key={route.path}><Screen parts={route.parts} /></main>
-      {settings.onboarded && <BackupReminder />}
       {showTabs && <TabBar current={route.path} />}
       <Notices />
       {needRefresh && (

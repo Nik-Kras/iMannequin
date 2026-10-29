@@ -90,8 +90,4 @@ export default {
   'settings.noModels': 'Моделі з’являться тут після налаштування.',
   'settings.weatherData': 'Дані про погоду',
   'settings.weatherCredit': 'Дані про погоду від Open-Meteo.com, лише коли підказку ввімкнено.',
-  'settings.reminderNever': 'Гардероб ще не збережено в копію.',
-  'settings.reminderOld': 'Остання копія старша за місяць.',
-  'settings.reminderAction': 'Створити копію',
-  'settings.reminderDismiss': 'Нагадати через місяць',
 } satisfies Record<keyof typeof en, string>;

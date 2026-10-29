@@ -71,6 +71,8 @@ export default function AdjustFit({ itemId }: { itemId?: string }) {
   const scale = mh / 2000;
 
   const placement = itemId ? layout?.scene.placements[itemId] : undefined;
+  // The pad waits for the garment to be placed: until then a tap would do nothing.
+  const ready = !!placement && !!fit;
   const handles = placement?.handles ?? [];
   const selected = handles.find((h) => h.name === sel) ?? handles.find((h) => h.kind === 'point');
   const group = item ? CATEGORY[item.category].group : 'top';
@@ -222,19 +224,19 @@ export default function AdjustFit({ itemId }: { itemId?: string }) {
               </MannequinStage>
             </div>
             <div className="af__pad" style={{ left: 12, top: '50%', transform: 'translateY(-50%)' }} role="group" aria-label={selected && mode === 'points' ? t('dressup.fit.selected', { name: handleName(selected) }) : t('dressup.fit.whole')}>
-              <PadButton label={t('dressup.fit.up')} onClick={() => nudge(0, -1)}><Icon name="down" size={20} style={{ transform: 'rotate(180deg)' }} /></PadButton>
-              <PadButton label={t('dressup.fit.left')} onClick={() => nudge(-1, 0)}><Icon name="back" size={20} /></PadButton>
-              <PadButton label={t('dressup.fit.right')} onClick={() => nudge(1, 0)}><Icon name="chevron" size={20} /></PadButton>
-              <PadButton label={t('dressup.fit.down')} onClick={() => nudge(0, 1)}><Icon name="down" size={20} /></PadButton>
+              <PadButton disabled={!ready} label={t('dressup.fit.up')} onClick={() => nudge(0, -1)}><Icon name="down" size={20} style={{ transform: 'rotate(180deg)' }} /></PadButton>
+              <PadButton disabled={!ready} label={t('dressup.fit.left')} onClick={() => nudge(-1, 0)}><Icon name="back" size={20} /></PadButton>
+              <PadButton disabled={!ready} label={t('dressup.fit.right')} onClick={() => nudge(1, 0)}><Icon name="chevron" size={20} /></PadButton>
+              <PadButton disabled={!ready} label={t('dressup.fit.down')} onClick={() => nudge(0, 1)}><Icon name="down" size={20} /></PadButton>
             </div>
             {mode === 'whole' && (
               <div className="af__pad" style={{ right: 12, top: '50%', transform: 'translateY(-50%)' }} role="group" aria-label={t('dressup.fit.whole')}>
-                <PadButton label={t('dressup.fit.bigger')} onClick={() => rescale(SCALE_STEP)}><Icon name="plus" size={20} /></PadButton>
-                <PadButton label={t('dressup.fit.smaller')} onClick={() => rescale(1 / SCALE_STEP)}>
+                <PadButton disabled={!ready} label={t('dressup.fit.bigger')} onClick={() => rescale(SCALE_STEP)}><Icon name="plus" size={20} /></PadButton>
+                <PadButton disabled={!ready} label={t('dressup.fit.smaller')} onClick={() => rescale(1 / SCALE_STEP)}>
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M5 12h14" /></svg>
                 </PadButton>
-                <PadButton label={t('dressup.fit.rotL')} onClick={() => turn(-TURN_STEP)}><Icon name="rotate" size={20} style={{ transform: 'scaleX(-1)' }} /></PadButton>
-                <PadButton label={t('dressup.fit.rotR')} onClick={() => turn(TURN_STEP)}><Icon name="rotate" size={20} /></PadButton>
+                <PadButton disabled={!ready} label={t('dressup.fit.rotL')} onClick={() => turn(-TURN_STEP)}><Icon name="rotate" size={20} style={{ transform: 'scaleX(-1)' }} /></PadButton>
+                <PadButton disabled={!ready} label={t('dressup.fit.rotR')} onClick={() => turn(TURN_STEP)}><Icon name="rotate" size={20} /></PadButton>
               </div>
             )}
           </>
@@ -259,8 +261,8 @@ export default function AdjustFit({ itemId }: { itemId?: string }) {
   );
 }
 
-function PadButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" className="icon-btn" aria-label={label} onClick={onClick}>{children}</button>;
+function PadButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+  return <button type="button" className="icon-btn" aria-label={label} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
 function bounds(hs: Handle[]) {
