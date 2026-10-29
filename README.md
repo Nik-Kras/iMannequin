@@ -140,7 +140,7 @@ flowchart TB
 
 - **207 unit tests** (Vitest) for the logic: the processing queue, worker lifecycle, backup and restore, search parsing, the pose check and body masks, garment fitting, naming, reminders and the crash black box.
 - **156 end-to-end tests on two phones** (Playwright): an iPhone in WebKit, Safari's engine, and an Android phone in Chromium, Chrome's engine. They run every flow with a fake camera and synthetic garments; a few run the real cut-out, classification and pose models to catch memory crashes and privacy leaks.
-- **A five-agent bug audit** found 50 issues, from lost photos to tap targets, and the first days on a real phone found four more. Each one has a test named after it that failed on the old code and passes now ([docs/bug-audit.md](docs/bug-audit.md)).
+- **A five-agent bug audit** found 50 issues, from lost photos to tap targets, and the first days on a real phone and in CI found five more. Each one has a test named after it that failed on the old code and passes now ([docs/bug-audit.md](docs/bug-audit.md)).
 - **CI** runs the type check, unit tests and both phones' end-to-end tests on every push; main deploys only when they pass.
 - **Crash reports** from real phones (Sentry, with an on-phone black box that reports out-of-memory closes on the next launch).
 
@@ -187,7 +187,7 @@ docs/           Decisions, architecture, try-on, design, bug audit
 - [Architecture](docs/architecture.md): stack, AI pipeline, data model, storage, privacy, diagnostics
 - [Mannequin & try-on](docs/try-on.md): body processing, garment anchors, fitting, layering
 - [Design](docs/design.md): the black-and-white paper-cut style, type, colour, components
-- [Bug audit](docs/bug-audit.md): 54 issues found and fixed, each with its test
+- [Bug audit](docs/bug-audit.md): 55 issues found and fixed, each with its test
 
 ## Disclaimer
 

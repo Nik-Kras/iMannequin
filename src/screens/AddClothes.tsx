@@ -46,10 +46,6 @@ export default function AddClothes() {
         });
         if (cancelled) { stream.getTracks().forEach((tr) => tr.stop()); return; }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
-        }
         setCam('live');
       } catch (e) {
         if (cancelled) return;
@@ -71,6 +67,15 @@ export default function AddClothes() {
       streamRef.current = null;
     };
   }, []);
+  // The stream plays once the video is shown: a video started while hidden can stay paused with no frames, and the
+  // shutter then does nothing (WebKit on Linux did).
+  useEffect(() => {
+    const v = videoRef.current;
+    const stream = streamRef.current;
+    if (cam !== 'live' || !v || !stream) return;
+    if (v.srcObject !== stream) v.srcObject = stream;
+    void v.play().catch(() => {});
+  }, [cam]);
 
   useEffect(() => {
     const id = setInterval(() => setTip((i) => (i + 1) % TIPS.length), 5000);
