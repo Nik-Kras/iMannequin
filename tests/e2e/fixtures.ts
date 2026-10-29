@@ -27,7 +27,16 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
   page: async ({ context }, use) => {
     const page = context.pages()[0] ?? (await context.newPage());
     const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(String(e)));
+    // WebKit on Linux reports the page's own image and worker loads that a reload or navigation cancelled as
+    // "Cannot load … due to access control checks". Those are ignored, but only right after the test navigates:
+    // the same message in a live page would be a broken image.
+    let navigatedAt = -Infinity;
+    page.on('request', (r) => { if (r.isNavigationRequest() && r.frame() === page.mainFrame()) navigatedAt = Date.now(); });
+    page.on('pageerror', (e) => {
+      const text = String(e);
+      if (/^(Error: )?Cannot load \S+ due to access control checks\.?$/.test(text) && Date.now() - navigatedAt < 3000) return;
+      errors.push(text);
+    });
     await use(page);
     if (errors.length) throw new Error('Page errors:\n' + errors.join('\n'));
   },
