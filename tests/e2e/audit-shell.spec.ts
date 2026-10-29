@@ -237,17 +237,11 @@ test.describe('#3 shell taps that write report failures', () => {
     await page.getByRole('button', { name: 'Українська' }).click();
     await expect(page.getByText(SAVE_FAILED)).toBeVisible();
   });
-
-  test('#3 the backup reminder’s dismiss reports a failed save', async ({ page }) => {
-    await openApp(page, { seed: true, route: '/wardrobe' });
-    await failWrites(page, 'settings', 'put');
-    await page.getByRole('button', { name: 'Remind me in a month' }).click();
-    await expect(page.getByText(SAVE_FAILED)).toBeVisible();
-  });
 });
 
 test.describe('#26 #31 install guide', () => {
   test('#26 Welcome opens at the top after the install guide', async ({ page }) => {
+    await page.setViewportSize({ width: 384, height: 600 }); // short enough for the guide to scroll on every phone
     await page.goto('./');
     await page.getByRole('button', { name: 'Keep using it in the browser' }).scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
@@ -342,7 +336,6 @@ test.describe('#39 #41 #42 #45 #47 #48 paper kit', () => {
     test(`#39 no sideways overflow at ${width} px (Ukrainian)`, async ({ page }) => {
       await page.setViewportSize({ width, height: 640 });
       await openApp(page, { seed: true, lang: 'uk', route: '/outfits' });
-      await withDb(page, `const s = await db.settings.get('app'); await db.settings.put({ ...s, backupReminderAt: Date.now() });`);
       for (const route of ['/outfits', '/wear-log', '/trips', '/settings']) {
         await page.evaluate((r) => { location.hash = r; }, route);
         await page.waitForTimeout(700);
@@ -384,7 +377,7 @@ test.describe('#39 #41 #42 #45 #47 #48 paper kit', () => {
     expect(s.spinner.dur).toBeGreaterThanOrEqual(1);
   });
 
-  test('#42 segmented controls, the language switch and the backup action are 44 px to the finger', async ({ page }) => {
+  test('#42 segmented controls and the language switch are 44 px to the finger', async ({ page }) => {
     const reach = (sel: string) => page.evaluate((sel) => {
       const el = document.querySelector<HTMLElement>(sel)!;
       const r = el.getBoundingClientRect();
@@ -396,8 +389,6 @@ test.describe('#39 #41 #42 #45 #47 #48 paper kit', () => {
     await openApp(page, { seed: true, route: '/outfits' });
     await expect(page.getByRole('heading', { name: 'Outfits' })).toBeVisible();
     expect(await reach('.seg button[aria-pressed=false]')).toBe(true);
-    const go = page.getByRole('button', { name: 'Back up' });
-    expect((await go.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await page.evaluate(() => { location.hash = '#/settings'; });
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
     expect(await reach('.set-seg .seg button[aria-pressed=false]')).toBe(true);

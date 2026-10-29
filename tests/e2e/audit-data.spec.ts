@@ -3,7 +3,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test as base, devices, expect, webkit, type BrowserContext, type Page } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Page } from '@playwright/test';
+import { phone } from './fixtures';
 import { failWrites, fakeDevice, garmentFile, modelMirror, openApp, withDb } from './helpers';
 import { MODEL_SPECS, hfUrl } from '../../src/ai/registry';
 
@@ -12,21 +13,16 @@ type LaunchOpts = { stallWorker?: boolean; models?: 'none' | 'mirror' };
 
 /** Like ./fixtures, but the same profile can be opened again after closing it (a relaunch). */
 const test = base.extend<{ launch: (o?: LaunchOpts) => Promise<App> }>({
-  launch: async ({}, use) => {
+  launch: async ({ playwright, browserName }, use, info) => {
     const dir = mkdtempSync(join(tmpdir(), 'imannequin-data-'));
     const open: BrowserContext[] = [];
     const errors: string[] = [];
     await use(async ({ stallWorker = false, models = 'none' } = {}) => {
-      const context = await webkit.launchPersistentContext(dir, {
-        ...devices['iPhone 15 Pro'],
-        baseURL: `http://localhost:${process.env.IMQ_PORT ?? '4183'}/iMannequin/`,
-        locale: 'en-GB',
-        timezoneId: 'Europe/London',
-      });
+      const context = await playwright[browserName].launchPersistentContext(dir, phone(info));
       open.push(context);
       await fakeDevice(context);
       if (models === 'none') await context.route('https://huggingface.co/**', (r) => r.abort());
-      else if (!(await modelMirror(context))) test.skip(true, 'IMQ_MODEL_MIRROR is not set');
+      else if (!(await modelMirror(context, browserName))) test.skip(true, 'IMQ_MODEL_MIRROR is not set');
       // An AI worker that never answers: the app is closed while the queue is still busy.
       if (stallWorker) await context.addInitScript(() => {
         (window as unknown as { Worker: unknown }).Worker = class { onmessage = null; onerror = null; postMessage() {} terminate() {} addEventListener() {} removeEventListener() {} };
@@ -140,20 +136,25 @@ test.describe('#2 garments from an earlier session keep their images', () => {
 });
 
 test.describe('#5 backup', () => {
-  test('#5 an image WebKit lost doesn\'t fail the backup; the file restores everything else', async ({ launch }, info) => {
+  test('#5 an image the phone can no longer read doesn\'t fail the backup; the file restores everything else', async ({ launch }, info) => {
     test.setTimeout(90_000);
-    let { context, page } = await launch();
-    await openApp(page, { route: '/wardrobe' });
-    await withDb(page, `${SEED_IMAGES}
-      await db.items.bulkPut([item('a', 'active'), item('b', 'active')]);
-      await db.photos.bulkPut([await photo('p-a', 'a', '#1f3a5f'), await photo('p-b', 'b', '#a33a2a')]);`);
-    await context.close();
-
-    ({ context, page } = await launch());
-    await context.addInitScript(() => { delete (Navigator.prototype as { share?: unknown }).share; delete (Navigator.prototype as { canShare?: unknown }).canShare; });
+    const { context, page } = await launch();
+    // WebKit loses stored images when their record is rewritten, but not every time. Here the lost images are
+    // marked "+lost" and fail to read the way WebKit's do, so the test is the same on every run and every phone.
+    await context.addInitScript(() => {
+      const read = Blob.prototype.arrayBuffer;
+      Blob.prototype.arrayBuffer = function (this: Blob) {
+        return this.type.endsWith('+lost') ? Promise.reject(new DOMException('The object can not be found here.', 'NotFoundError')) : read.call(this);
+      };
+      delete (Navigator.prototype as { share?: unknown }).share;
+      delete (Navigator.prototype as { canShare?: unknown }).canShare;
+    });
     await openApp(page, { route: '/settings' });
-    // Rewriting a record with its stored Blobs (what #2 fixed in the app) still kills them in this session.
-    await withDb(page, `const p = await db.photos.get('p-b'); await db.photos.put({ ...p, cutoutApproved: true });`);
+    await withDb(page, `${SEED_IMAGES}
+      const lose = async (b) => new Blob([await b.arrayBuffer()], { type: b.type + '+lost' });
+      const b = await photo('p-b', 'b', '#a33a2a');
+      await db.items.bulkPut([item('a', 'active'), item('b', 'active')]);
+      await db.photos.bulkPut([await photo('p-a', 'a', '#1f3a5f'), { ...b, original: await lose(b.original), cutout: await lose(b.cutout), thumb: await lose(b.thumb) }]);`);
     expect((await deadBlobs(page)).length).toBe(3);
 
     const download = page.waitForEvent('download', { timeout: 20_000 });

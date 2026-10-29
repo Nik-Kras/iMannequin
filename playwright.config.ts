@@ -4,19 +4,25 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = process.env.IMQ_PORT ?? '4183';
 const BASE = `http://localhost:${PORT}/iMannequin/`;
 
-// WebKit is the engine behind iPhone Safari; the device profile gives iPhone size, touch and user agent.
+// Two phones: iPhone (WebKit, the engine behind iPhone Safari) and Android (Chromium, the engine behind Chrome).
+// The Android profile is the owner's Galaxy S25 Ultra as it reported itself to Sentry: 384 × 832 at 2.8125×.
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
   fullyParallel: true,
   reporter: [['list']],
   use: {
-    ...devices['iPhone 15 Pro'],
-    browserName: 'webkit',
     baseURL: BASE,
     locale: 'en-GB',
     timezoneId: 'Europe/London',
   },
+  projects: [
+    { name: 'iphone', use: { ...devices['iPhone 15 Pro'], browserName: 'webkit' } },
+    {
+      name: 'android',
+      use: { ...devices['Pixel 9'], viewport: { width: 384, height: 832 }, screen: { width: 384, height: 832 }, deviceScaleFactor: 2.8125, browserName: 'chromium' },
+    },
+  ],
   webServer: {
     command: 'pnpm build && pnpm preview',
     url: BASE,

@@ -671,11 +671,11 @@ test.describe('#50 copy', () => {
     await expect(page.getByText(/zzzz/)).toHaveCount(1);
   });
 
-  test('#50 the camera-denied message points to the iPhone setting', async ({ context, page }) => {
+  test('#50 the camera-denied message points to the phone’s own setting', async ({ context, page, browserName }) => {
     await context.addInitScript(() => {
       navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Permission denied', 'NotAllowedError'); };
     });
     await openApp(page, { route: '/add' });
-    await expect(page.getByText(/Settings → Safari → Camera/)).toBeVisible();
+    await expect(page.getByText(browserName === 'webkit' ? /Settings → Safari → Camera/ : /phone’s settings for this app/)).toBeVisible();
   });
 });
