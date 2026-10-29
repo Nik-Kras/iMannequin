@@ -149,7 +149,8 @@ There are no analytics and no fonts from a CDN. `@mediapipe/tasks-vision` posts 
   - layering rules
   - backup round-trip
   - i18n key parity between `en` and `uk`
-- **UI smoke (Playwright, WebKit + Chromium):** add an item from a fixture photo, put it on the mannequin, save an outfit, back up and restore. Model calls are stubbed.
+- **End-to-end (Playwright), on two phones (D63):** an iPhone (WebKit, iPhone 15 Pro) and an Android phone (Chromium, 384 × 832 at 2.8125×). Every flow runs with a fake camera, synthetic garments and a fake pose; a few tests run the real MediaPipe, cut-out and CLIP models. The models come from a local mirror (`IMQ_MODEL_MIRROR`); Chromium gets them through a local file server, because a 100+ MB response through the test protocol closes it.
+- **CI** (`.github/workflows/ci.yml`) runs typecheck, unit and both phones' end-to-end tests on every push and pull request; main deploys only when they pass.
 - **Fixtures:** synthetic or public-domain images only, with their licences recorded next to them (R2). No real body or wardrobe photos.
 - **Real phones:** model quality and speed through the Model lab (D12).
 

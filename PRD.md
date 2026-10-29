@@ -135,7 +135,7 @@ It's free, installs from a QR code on Android and iPhone, and runs entirely on t
 - **Export** writes one file with all data and photos. It's saved through the share sheet, for example to iCloud Drive or Google Drive.
 - **Restore** reads that file back, replacing the current wardrobe after a confirmation.
 - The export screen warns that the file contains the body photo.
-- Reminder: Q10.
+- No reminder banner: Settings → Backup shows when the last backup was made (D54).
 
 ### F17. Install and offline
 - When opened in a browser tab, the app shows how to install it (Q16).

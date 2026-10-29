@@ -303,9 +303,12 @@ Everything is synthetic (R2): garments are the design canvas's paper shapes, the
 53. **Low · The centre + is cut by the tab bar's torn edge.** The torn paper strip along the top of the tab bar (`.tabbar::before`) is a positioned element, so it painted over the raised + and cut a band across its top, leaving a dark sliver above the zigzag. Found by the owner on the phone.
    - **Fix:** the + is positioned above the strip; its white ring now covers the torn edge, as designed. A test checks that the top of the + is the button itself.
 
+54. **Low · Adjust fit's arrow pad ignored taps for a moment.** The pad was drawn before the garment was placed on the mannequin, and a tap in that moment did nothing. Under load an end-to-end test caught it (it failed once in 155).
+   - **Fix:** the pad is disabled until the garment is placed. The test passed 90 times in a row afterwards.
+
 ## Status
 
-**All 50 items are fixed (2026-10-28)**, two of them only in part (#9 and #40), and so are #51–#53, found on the owner's phone afterwards. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
+**All 50 items are fixed (2026-10-28)**, two of them only in part (#9 and #40), and so are #51–#54, three found on the owner's phone and one by a flaky test afterwards. Each item has tests named after its number (`#N`). They fail on the old code and pass on the fixed code.
 
 **How it was fixed.** Four agents worked in parallel, each in its own git worktree and owning a set of files:
 - data, AI and memory;
@@ -376,3 +379,9 @@ New unit tests cover the queue runner, worker lifecycle, backup, search, reminde
 - Text Size.
 
 Any failure there reaches Sentry (D50).
+
+**Test reliability (2026-10-29).** The end-to-end tests now also run on an Android phone in Chromium (D63). That surfaced only test problems, now fixed:
+- the model mirror handed 100+ MB files through the test protocol, which closes Chromium (now a local file server);
+- `openApp` rewrote the settings outside a transaction and could erase a flag the app had just set (#34 failed 5 times in 30; now 60 of 60);
+- the backup test (#5) relied on WebKit losing images, which it doesn't do every time (now the lost images are simulated: 20 of 20 on both phones);
+- #26, #42 and #50 assumed an iPhone screen, the removed backup banner (D54) and the iPhone's camera setting.

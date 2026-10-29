@@ -3,13 +3,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Nik-Kras/iMannequin/actions/workflows/deploy.yml"><img src="https://github.com/Nik-Kras/iMannequin/actions/workflows/deploy.yml/badge.svg" alt="Deploy"></a>
+  <a href="https://github.com/Nik-Kras/iMannequin/actions/workflows/ci.yml"><img src="https://github.com/Nik-Kras/iMannequin/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://nik-kras.github.io/iMannequin/"><img src="https://img.shields.io/badge/live-nik--kras.github.io%2FiMannequin-141414?logo=githubpages&logoColor=white" alt="Live app"></a>
   <img src="https://img.shields.io/badge/iPhone%20%26%20Android-installable%20web%20app-141414?logo=pwa&logoColor=white" alt="iPhone and Android installable web app">
   <img src="https://img.shields.io/badge/AI-on%20the%20phone-55524C" alt="AI runs on the phone">
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
   <img src="https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white" alt="TypeScript 7">
-  <img src="https://img.shields.io/badge/tests-216%20unit%20%C2%B7%20156%20e2e-B3261E" alt="216 unit and 156 end-to-end tests">
+  <img src="https://img.shields.io/badge/tests-207%20unit%20%C2%B7%20156%20e2e%20%C3%97%202%20phones-B3261E" alt="207 unit tests and 156 end-to-end tests on two phones">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
@@ -55,7 +55,7 @@ Open **iMannequin** from the home screen. The first launch downloads the AI mode
 - **Not worn in 6 months** lists what to wear or give away; the **wear log** is a calendar you can correct day by day.
 - **Seasonal swap** moves a whole season into storage in one go.
 - **Packing lists** group a trip's outfits and pieces by where they're kept, and stamp each one as packed.
-- **Backup to one file** (iCloud Drive, Google Drive, anywhere), because deleting a home-screen app deletes its data.
+- **Backup to one file** (iCloud Drive, Google Drive, anywhere), because deleting a home-screen app deletes its data. Settings shows when you last made one.
 
 English and Ukrainian, Text Size and Reduce Motion respected, VoiceOver labels throughout, and an optional weather hint (off by default).
 
@@ -138,9 +138,10 @@ flowchart TB
 
 ## Quality
 
-- **216 unit tests** (Vitest) for the logic: the processing queue, worker lifecycle, backup and restore, search parsing, the pose check and body masks, garment fitting, naming, reminders and the crash black box.
-- **156 end-to-end tests** (Playwright on WebKit, Safari's engine, at iPhone size) run every flow with a fake camera and synthetic garments. A few run the real cut-out, classification and pose models to catch memory crashes and privacy leaks.
-- **A five-agent bug audit** found 50 issues, from lost photos to tap targets, and the first days on a real phone found three more. Each one has a test named after it that failed on the old code and passes now ([docs/bug-audit.md](docs/bug-audit.md)).
+- **207 unit tests** (Vitest) for the logic: the processing queue, worker lifecycle, backup and restore, search parsing, the pose check and body masks, garment fitting, naming, reminders and the crash black box.
+- **156 end-to-end tests on two phones** (Playwright): an iPhone in WebKit, Safari's engine, and an Android phone in Chromium, Chrome's engine. They run every flow with a fake camera and synthetic garments; a few run the real cut-out, classification and pose models to catch memory crashes and privacy leaks.
+- **A five-agent bug audit** found 50 issues, from lost photos to tap targets, and the first days on a real phone found four more. Each one has a test named after it that failed on the old code and passes now ([docs/bug-audit.md](docs/bug-audit.md)).
+- **CI** runs the type check, unit tests and both phones' end-to-end tests on every push; main deploys only when they pass.
 - **Crash reports** from real phones (Sentry, with an on-phone black box that reports out-of-memory closes on the next launch).
 
 ## Develop
@@ -150,12 +151,12 @@ pnpm install
 pnpm dev                       # http://localhost:5173/iMannequin/   (add ?seed for the sample wardrobe)
 pnpm test                      # unit tests
 pnpm build && pnpm preview     # production build on http://localhost:4183/iMannequin/
-pnpm e2e                       # end-to-end tests in WebKit at iPhone size, against the preview
+pnpm e2e                       # end-to-end tests on both phones against the preview (--project=iphone or android)
 ```
 
 `IMQ_PORT` runs the preview and the tests on another port. `IMQ_MODEL_MIRROR=<folder>` serves the real AI models from a local copy (laid out as `<org>/<repo>/<file>`); without it, the tests that need them are skipped.
 
-Pushing to `main` builds and deploys to GitHub Pages (`.github/workflows/deploy.yml`). With the `SENTRY_AUTH_TOKEN` secret set, the build uploads source maps to Sentry and removes them from the site.
+Every push runs the checks and both phones' tests (`.github/workflows/ci.yml`); a push to `main` then builds and deploys to GitHub Pages, only if they pass. With the `SENTRY_AUTH_TOKEN` secret set, the build uploads source maps to Sentry and removes them from the site.
 
 ## Project structure
 
@@ -182,11 +183,11 @@ docs/           Decisions, architecture, try-on, design, bug audit
 ## Documents
 
 - [PRD](PRD.md): who it's for, every feature, body zones and categories
-- [Decisions](docs/decisions.md): 61 decisions, each with the options considered and why
+- [Decisions](docs/decisions.md): 63 decisions, each with the options considered and why
 - [Architecture](docs/architecture.md): stack, AI pipeline, data model, storage, privacy, diagnostics
 - [Mannequin & try-on](docs/try-on.md): body processing, garment anchors, fitting, layering
 - [Design](docs/design.md): the black-and-white paper-cut style, type, colour, components
-- [Bug audit](docs/bug-audit.md): 53 issues found and fixed, each with its test
+- [Bug audit](docs/bug-audit.md): 54 issues found and fixed, each with its test
 
 ## Disclaimer
 
