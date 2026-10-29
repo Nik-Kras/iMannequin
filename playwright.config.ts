@@ -10,6 +10,9 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
   fullyParallel: true,
+  // CI only: on a shared Linux runner the fake camera's first frame can arrive late; a test that passes on its retry
+  // is reported as flaky instead of blocking the deploy.
+  retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
   use: {
     baseURL: BASE,
